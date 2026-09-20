@@ -597,3 +597,203 @@ top10_causes <- cause_burden |>
   dplyr::arrange(measure_short, cluster_name, dplyr::desc(estimate)) |>
   dplyr::mutate(rank_within_cluster = dplyr::row_number()) |>
   dplyr::ungroup()
+readr::write_csv(
+  top10_causes,
+  file.path(output_dir, "Part3_30_69_top10_causes_by_cluster_measure.csv")
+)
+
+# Dedicated DALY table for the main text.
+top10_daly <- top10_causes |>
+  dplyr::filter(measure_short == "DALYs") |>
+  dplyr::arrange(cluster_name, rank_within_cluster)
+
+readr::write_csv(
+  top10_daly,
+  file.path(output_dir, "Part3_30_69_top10_DALY_causes.csv")
+)
+
+# ------------------------------------------------------------------------------
+# 12. Figure 5 — 30-69 burden composition by disease cluster
+# ------------------------------------------------------------------------------
+
+p5 <- ggplot2::ggplot(
+  cluster_burden,
+  ggplot2::aes(
+    x = measure_short,
+    y = share_of_classified,
+    fill = cluster_name
+  )
+) +
+  ggplot2::geom_col(width = 0.72, color = "white", linewidth = 0.25) +
+  ggplot2::geom_text(
+    ggplot2::aes(
+      label = dplyr::if_else(
+        share_of_classified >= 0.04,
+        scales::percent(share_of_classified, accuracy = 0.1),
+        ""
+      )
+    ),
+    position = ggplot2::position_stack(vjust = 0.5),
+    color = "white",
+    fontface = "bold",
+    size = 3.4
+  ) +
+  ggplot2::scale_fill_manual(
+    values = cluster_colors,
+    breaks = cluster_order,
+    drop = FALSE
+  ) +
+  ggplot2::scale_y_continuous(
+    labels = scales::percent_format(accuracy = 1),
+    expand = ggplot2::expansion(mult = c(0, 0.02))
+  ) +
+  ggplot2::labs(
+    title = "Disease burden among adults aged 30–69 years by age-profile cluster, China, 2023",
+    subtitle = "Shares are calculated within the 292 causes classified by the fixed 2023 K-means++ solution",
+    x = NULL,
+    y = "Share of classified 30–69 burden",
+    fill = "Disease cluster",
+    caption = paste0(
+      "Source: GBD 2023, Both sexes. Numbers are summed across 30–34 to 65–69 years. ",
+      "Cluster membership is frozen from Stage 1 and is not re-estimated here."
+    )
+  ) +
+  ggplot2::theme_bw(base_size = 13) +
+  ggplot2::theme(
+    legend.position = "bottom",
+    panel.grid.minor = ggplot2::element_blank(),
+    panel.grid.major.x = ggplot2::element_blank(),
+    plot.title = ggplot2::element_text(face = "bold", size = 16),
+    plot.subtitle = ggplot2::element_text(color = "grey35", size = 10.5),
+    plot.caption = ggplot2::element_text(size = 8, color = "grey40", hjust = 0)
+  )
+
+save_plot_pair(
+  p5,
+  "Part3_Figure5_30_69_cluster_burden_composition",
+  width = 9.2,
+  height = 6.4
+)
+
+# ------------------------------------------------------------------------------
+# 13. Figure 6 — age gradient in cluster contribution, ages 30-69
+# ------------------------------------------------------------------------------
+# Deaths and DALYs are shown because they summarize the two policy-relevant
+# dimensions most directly: premature mortality and total health loss.
+
+figure6_data <- age_cluster_shares |>
+  dplyr::filter(measure_short %in% c("Deaths", "DALYs")) |>
+  dplyr::mutate(
+    panel = factor(
+      as.character(measure_short),
+      levels = c("Deaths", "DALYs"),
+      labels = c("Deaths", "DALYs")
+    )
+  )
+
+p6 <- ggplot2::ggplot(
+  figure6_data,
+  ggplot2::aes(
+    x = age_midpoint,
+    y = share_of_classified,
+    color = cluster_name,
+    group = cluster_name
+  )
+) +
+  ggplot2::geom_line(linewidth = 1.15, lineend = "round") +
+  ggplot2::geom_point(size = 2.2) +
+  ggplot2::facet_wrap(~panel, nrow = 1) +
+  ggplot2::scale_color_manual(
+    values = cluster_colors,
+    breaks = cluster_order,
+    drop = FALSE
+  ) +
+  ggplot2::scale_x_continuous(
+    breaks = age_midpoints_30_69,
+    labels = age_30_69,
+    expand = ggplot2::expansion(mult = c(0.02, 0.02))
+  ) +
+  ggplot2::scale_y_continuous(
+    labels = scales::percent_format(accuracy = 1),
+    limits = c(0, 1),
+    expand = ggplot2::expansion(mult = c(0, 0.02))
+  ) +
+  ggplot2::labs(
+    title = "Age gradient in disease-cluster contribution, China, 2023",
+    subtitle = "Cluster share of classified burden within each five-year age group from 30 to 69 years",
+    x = "Age group",
+    y = "Share within age group",
+    color = "Disease cluster",
+    caption = "Source: GBD 2023, Both sexes. Cluster membership is fixed from the Stage 1 DALY age-profile classification."
+  ) +
+  ggplot2::theme_bw(base_size = 12.5) +
+  ggplot2::theme(
+    legend.position = "bottom",
+    panel.grid.minor = ggplot2::element_blank(),
+    panel.grid.major = ggplot2::element_line(color = "grey92", linewidth = 0.4),
+    strip.background = ggplot2::element_rect(fill = "grey94", color = "grey75"),
+    strip.text = ggplot2::element_text(face = "bold"),
+    axis.text.x = ggplot2::element_text(angle = 45, hjust = 1),
+    plot.title = ggplot2::element_text(face = "bold", size = 16),
+    plot.subtitle = ggplot2::element_text(color = "grey35", size = 10.5),
+    plot.caption = ggplot2::element_text(size = 8, color = "grey40", hjust = 0)
+  )
+
+save_plot_pair(
+  p6,
+  "Part3_Figure6_30_69_age_gradient_cluster_shares",
+  width = 11,
+  height = 6.2
+)
+
+# ------------------------------------------------------------------------------
+# 14. Figure 7 — leading 30-69 DALY causes within each cluster
+# ------------------------------------------------------------------------------
+
+figure7_data <- top10_daly |>
+  dplyr::mutate(
+    cause_panel = paste(cause, cluster_name, sep = "___"),
+    cause_panel = forcats::fct_reorder(cause_panel, estimate)
+  )
+
+p7 <- ggplot2::ggplot(
+  figure7_data,
+  ggplot2::aes(x = estimate, y = cause_panel, fill = cluster_name)
+) +
+  ggplot2::geom_col(width = 0.72) +
+  ggplot2::facet_wrap(~cluster_name, scales = "free_y", ncol = 1) +
+  ggplot2::scale_fill_manual(values = cluster_colors, guide = "none") +
+  ggplot2::scale_y_discrete(labels = function(x) sub("___.*$", "", x)) +
+  ggplot2::scale_x_continuous(
+    labels = scales::label_number(scale = 1e-6, suffix = " M", accuracy = 0.1)
+  ) +
+  ggplot2::labs(
+    title = "Leading causes of DALYs among adults aged 30–69 years within each disease cluster, China, 2023",
+    subtitle = "Top ten detailed causes by DALY numbers summed across 30–34 to 65–69 years",
+    x = "DALYs (millions)",
+    y = NULL,
+    caption = "Source: GBD 2023, Both sexes. Cluster membership is fixed from Stage 1."
+  ) +
+  ggplot2::theme_bw(base_size = 11) +
+  ggplot2::theme(
+    panel.grid.minor = ggplot2::element_blank(),
+    panel.grid.major.y = ggplot2::element_blank(),
+    strip.background = ggplot2::element_rect(fill = "grey94", color = "grey75"),
+    strip.text = ggplot2::element_text(face = "bold"),
+    plot.title = ggplot2::element_text(face = "bold", size = 15),
+    plot.subtitle = ggplot2::element_text(color = "grey35"),
+    plot.caption = ggplot2::element_text(size = 8, color = "grey40", hjust = 0)
+  )
+
+save_plot_pair(
+  p7,
+  "Part3_Figure7_30_69_top_DALY_causes_by_cluster",
+  width = 10.8,
+  height = 12
+)
+
+# ------------------------------------------------------------------------------
+# 15. Supplementary Figure S1 — age-specific rates for all four measures
+# ------------------------------------------------------------------------------
+
+p_s1 <- ggplot2::ggplot(
