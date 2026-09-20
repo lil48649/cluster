@@ -50,3 +50,44 @@ Outputs are written to `Stage2_Figure2_onward_outputs/` and include:
 ## Methodological rule
 
 The disease classification is defined only by the completed Stage 1 all-age 2023 DALY-rate trajectory clustering. Ages 30–69 are an independent downstream public-health analysis window; disease membership is never re-estimated within that window.
+
+
+---
+
+## Part 3: 1990–2023 trends at ages 30–69
+
+Script:
+
+`Part3_1990_2023_trends.R`
+
+This analysis keeps the finalized 2023 three-cluster membership fixed and applies it retrospectively to every year from 1990 through 2023. Clustering is never rerun by year.
+
+### Required trend files
+
+Place these seven CSVs in the working directory:
+
+- `IHME-GBD_2023_DATA-1990-1994.csv`
+- `IHME-GBD_2023_DATA-1995-1999.csv`
+- `IHME-GBD_2023_DATA-2000-2004.csv`
+- `IHME-GBD_2023_DATA-2005-2009.csv`
+- `IHME-GBD_2023_DATA-2010-2014.csv`
+- `IHME-GBD_2023_DATA-2015-2019.csv`
+- `IHME-GBD_2023_DATA-2020-2023.csv`
+
+Each batch should use the same settings: China, Both sexes, ages 30–34 through 65–69, Deaths/YLLs/YLDs/DALYs, Number + Rate, All causes plus all 304 detailed causes, and All Population.
+
+The script automatically looks for the frozen membership in `Stage2_Figure2_onward_outputs/Stage2_frozen_cluster_membership_used.csv` first, then falls back to the original Stage 1 membership filenames.
+
+### Part 3 main outputs
+
+- **Figure 6:** Death and DALY trends, showing absolute numbers and standardized rates.
+- **Figure 7:** changing cluster shares of Deaths, YLLs, YLDs and DALYs from 1990 to 2023.
+- **Figure 8:** three-factor Shapley decomposition of the 1990→2023 burden change into population size, age structure and age-specific rates.
+- **Table 2:** 1990 vs 2023 values, percentage changes and EAPC of standardized rates.
+- **Table 3:** Shapley decomposition results for all four measures.
+- Cause-level DALY changes between 1990 and 2023.
+- Yearly closure against GBD `All causes` and historical burden auditing for the 12 causes excluded from the 2023 clustering.
+
+### Rate standardization
+
+Because the downloaded data contain eight age-specific rates rather than a pre-computed 30–69 age-standardized rate, Part 3 uses direct standardization with the **2023 China age distribution within ages 30–69** as a fixed internal standard. These rates are intended for within-China temporal comparisons and should not be described as GBD global age-standardized rates.
