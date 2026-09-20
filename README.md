@@ -1,56 +1,52 @@
 # China GBD 2023 disease age-profile clustering — Stage 2
 
-This repository contains the next analysis step after the finalized China 2023 K-means++ disease age-profile clustering.
+This repository continues the finalized Stage 1 K-means++ age-profile clustering analysis.
 
-## Current script
+## Current analysis script
 
-`Part3_30_69_burden_2023.R`
+`Stage2_Figure2_onward.R`
 
-The script analyzes the burden of the **frozen three-cluster solution** among adults aged **30–69 years** in China in 2023. It does **not** rerun K-means++.
+The script **does not rerun clustering**. It reads the frozen three-cluster membership from Stage 1 and reorganizes the downstream burden analysis around the study's main public-health window, ages 30–69 years.
+
+### Main-text figure structure
+
+- **Figure 1** is produced by the completed Stage 1 clustering script and is not regenerated here.
+- **Figure 2:** all-age age-specific mortality and YLD rates by disease cluster. This bridges the life-course clustering result to real-world mortality and disability burden.
+- **Figure 3:** all-age versus ages 30–69 burden composition for Deaths, YLLs, YLDs and DALYs.
+- **Figure 4:** cluster contribution across the eight five-year age groups from 30–34 to 65–69 years, focusing on Deaths and DALYs.
+- **Figure 5:** top 10 DALY causes within each cluster among ages 30–69 years.
+
+The former all-age Top-10-cause figure is retained as a supplementary figure rather than as a main-text figure.
 
 ### Required local inputs
 
-Place the script in the same directory as:
+Place the script in the same working directory as:
 
-1. `IHME-GBD_2023_DATA-26354bec-1.csv` (or the `(1)` filename variant), containing China, Both sexes, 2023, Deaths/YLLs/YLDs/DALYs, Number and Rate; and
-2. the finalized Stage 1 membership file, either:
-   - `Figure1_k3_cluster_membership.csv`, or
-   - `Part2_cluster_membership.csv`.
+1. `IHME-GBD_2023_DATA-26354bec-1.csv` or `IHME-GBD_2023_DATA-26354bec-1(1).csv`; and
+2. the frozen Stage 1 membership file, either `Figure1_k3_cluster_membership.csv` or `Part2_cluster_membership.csv`.
 
-The frozen solution is checked against the finalized cluster sizes:
+The script checks the finalized solution before proceeding:
 
 - Infant: 57 causes
 - Adult: 71 causes
 - Aging-related: 164 causes
 - Total: 292 causes
 
-### Analysis window
+If those counts do not match, execution stops so that later burden analyses cannot silently change the disease classification.
 
-Eight mutually exclusive age groups are included:
+### Outputs
 
-30–34, 35–39, 40–44, 45–49, 50–54, 55–59, 60–64 and 65–69 years.
+Outputs are written to `Stage2_Figure2_onward_outputs/` and include:
 
-### Main outputs
-
-The script creates a `Part3_30_69_2023_outputs/` directory containing:
-
-- cluster burden summaries for Deaths, YLLs, YLDs and DALYs;
-- classified-cause closure against GBD All causes;
-- crude 30–69 rates per 100,000 using population denominators inferred from GBD Number/Rate pairs;
-- age-specific cluster rates and cluster shares;
-- YLL/DALY and YLD/DALY burden phenotype by cluster;
-- top-10 causes within each cluster for all four measures;
-- manuscript figures in PNG and PDF;
+- main Figures 2–5 in PNG and PDF;
+- supplementary all-age Top-10 DALY causes;
+- supplementary four-measure age-specific rate figure for ages 30–69;
+- supplementary YLL-versus-YLD DALY composition figure;
+- source-data CSVs for every main figure;
+- all-age and 30–69 closure checks against GBD `All causes`;
+- 30–69 cluster burden tables and cause-level burden tables;
 - an RDS bundle and `sessionInfo.txt` for reproducibility.
-
-### Main figures
-
-- **Figure 5:** 30–69 burden composition by cluster.
-- **Figure 6:** age gradient in cluster shares for Deaths and DALYs.
-- **Figure 7:** top 10 DALY causes within each cluster among ages 30–69.
-- **Figure S1:** age-specific cluster rates for all four measures.
-- **Figure S2:** fatal (YLL) versus non-fatal (YLD) composition of DALYs.
 
 ## Methodological rule
 
-The disease classification is based only on the completed Stage 1 2023 all-age DALY-rate age-profile clustering. The 30–69-year analysis is a downstream public-health analysis window and must not re-estimate disease clusters.
+The disease classification is defined only by the completed Stage 1 all-age 2023 DALY-rate trajectory clustering. Ages 30–69 are an independent downstream public-health analysis window; disease membership is never re-estimated within that window.
