@@ -398,3 +398,202 @@ all_causes_number <- analysis_data |>
   dplyr::summarise(all_causes_30_69 = sum(val, na.rm = TRUE), .groups = "drop")
 
 classified_measure_totals <- cluster_number |>
+  dplyr::group_by(measure, measure_short) |>
+  dplyr::summarise(classified_total_30_69 = sum(estimate), .groups = "drop")
+
+cluster_burden <- cluster_number |>
+  dplyr::left_join(classified_measure_totals, by = c("measure", "measure_short")) |>
+  dplyr::left_join(all_causes_number, by = c("measure", "measure_short")) |>
+  dplyr::mutate(
+    share_of_classified = safe_ratio(estimate, classified_total_30_69),
+    share_of_all_causes = safe_ratio(estimate, all_causes_30_69),
+    classified_coverage_of_all_causes = safe_ratio(
+      classified_total_30_69,
+      all_causes_30_69
+    ),
+    crude_rate_per_100k_30_69 = estimate / population_30_69 * 100000,
+    measure_short = factor(
+      measure_short,
+      levels = c("Deaths", "YLLs", "YLDs", "DALYs")
+    ),
+    cluster_name = factor(cluster_name, levels = cluster_order)
+  ) |>
+  dplyr::arrange(measure_short, cluster_name)
+
+readr::write_csv(
+  cluster_burden,
+  file.path(output_dir, "Part3_30_69_cluster_burden_summary.csv")
+)
+
+# Wide, manuscript-friendly table.
+cluster_burden_wide <- cluster_burden |>
+  dplyr::select(
+    cluster_name, measure_short, estimate,
+    share_of_classified, share_of_all_causes,
+    crude_rate_per_100k_30_69
+  ) |>
+  tidyr::pivot_wider(
+    names_from = measure_short,
+    values_from = c(
+      estimate, share_of_classified,
+      share_of_all_causes, crude_rate_per_100k_30_69
+    ),
+    names_glue = "{measure_short}_{.value}"
+  )
+
+readr::write_csv(
+  cluster_burden_wide,
+  file.path(output_dir, "Part3_30_69_cluster_burden_table_wide.csv")
+)
+
+# Closure of the frozen 292 causes against GBD All causes within 30-69.
+closure_30_69 <- classified_measure_totals |>
+  dplyr::left_join(all_causes_number, by = c("measure", "measure_short")) |>
+  dplyr::mutate(
+    classified_to_all_ratio = safe_ratio(
+      classified_total_30_69,
+      all_causes_30_69
+    )
+  ) |>
+  dplyr::arrange(match(measure, measure_order))
+
+readr::write_csv(
+  closure_30_69,
+  file.path(output_dir, "Part3_30_69_classified_to_all_causes_closure.csv")
+)
+
+# ------------------------------------------------------------------------------
+# 9. Mortality-disability phenotype: YLL and YLD composition of DALYs
+# ------------------------------------------------------------------------------
+
+phenotype <- cluster_number |>
+  dplyr::select(cluster_name, measure_short, estimate) |>
+  tidyr::pivot_wider(names_from = measure_short, values_from = estimate) |>
+  dplyr::mutate(
+    YLL_fraction_of_DALYs = safe_ratio(YLLs, DALYs),
+    YLD_fraction_of_DALYs = safe_ratio(YLDs, DALYs),
+    YLL_to_YLD_ratio = safe_ratio(YLLs, YLDs),
+    DALY_identity_relative_error = safe_ratio(
+      abs(DALYs - (YLLs + YLDs)),
+      DALYs
+    )
+  ) |>
+  dplyr::arrange(cluster_name)
+
+readr::write_csv(
+  phenotype,
+  file.path(output_dir, "Part3_30_69_mortality_disability_profile.csv")
+)
+
+# ------------------------------------------------------------------------------
+# 10. Age-specific cluster rates and cluster shares, ages 30-69
+# ------------------------------------------------------------------------------
+# Cause-specific GBD rates within one age group have the same denominator, so
+# they can be summed across mutually exclusive detailed causes within a cluster.
+
+age_cluster_rates <- classified_data |>
+  dplyr::filter(metric == "Rate") |>
+  dplyr::group_by(
+    measure, measure_short, cluster_name,
+    age, age_index, age_midpoint
+  ) |>
+  dplyr::summarise(rate_per_100k = sum(val, na.rm = TRUE), .groups = "drop") |>
+  tidyr::complete(
+    measure,
+    cluster_name = factor(cluster_order, levels = cluster_order),
+    age = factor(age_30_69, levels = age_30_69, ordered = TRUE),
+    fill = list(rate_per_100k = 0)
+  ) |>
+  dplyr::mutate(
+    measure_short = unname(measure_short_lookup[measure]),
+    age_index = as.integer(age),
+    age_midpoint = age_midpoints_30_69[age_index],
+    cluster_name = factor(cluster_name, levels = cluster_order),
+    measure_short = factor(
+      measure_short,
+      levels = c("Deaths", "YLLs", "YLDs", "DALYs")
+    )
+  )
+
+all_causes_age_rates <- analysis_data |>
+  dplyr::filter(metric == "Rate", cause == "All causes") |>
+  dplyr::transmute(
+    measure,
+    age,
+    all_causes_rate_per_100k = val
+  )
+
+age_cluster_shares <- age_cluster_rates |>
+  dplyr::group_by(measure, measure_short, age, age_index, age_midpoint) |>
+  dplyr::mutate(
+    classified_rate_per_100k = sum(rate_per_100k),
+    share_of_classified = safe_ratio(rate_per_100k, classified_rate_per_100k)
+  ) |>
+  dplyr::ungroup() |>
+  dplyr::left_join(all_causes_age_rates, by = c("measure", "age")) |>
+  dplyr::mutate(
+    share_of_all_causes = safe_ratio(
+      rate_per_100k,
+      all_causes_rate_per_100k
+    ),
+    classified_coverage_of_all_causes = safe_ratio(
+      classified_rate_per_100k,
+      all_causes_rate_per_100k
+    )
+  ) |>
+  dplyr::arrange(measure_short, age_index, cluster_name)
+
+readr::write_csv(
+  age_cluster_rates,
+  file.path(output_dir, "Part3_30_69_age_specific_cluster_rates.csv")
+)
+readr::write_csv(
+  age_cluster_shares,
+  file.path(output_dir, "Part3_30_69_age_specific_cluster_shares.csv")
+)
+
+# ------------------------------------------------------------------------------
+# 11. Cause-level 30-69 burden and leading causes in each cluster
+# ------------------------------------------------------------------------------
+
+cause_burden <- classified_data |>
+  dplyr::filter(metric == "Number") |>
+  dplyr::group_by(measure, measure_short, cluster_name, cause) |>
+  dplyr::summarise(estimate = sum(val, na.rm = TRUE), .groups = "drop") |>
+  dplyr::left_join(
+    cluster_number |>
+      dplyr::rename(cluster_total = estimate) |>
+      dplyr::select(measure, cluster_name, cluster_total),
+    by = c("measure", "cluster_name")
+  ) |>
+  dplyr::left_join(
+    classified_measure_totals,
+    by = c("measure", "measure_short")
+  ) |>
+  dplyr::left_join(
+    all_causes_number,
+    by = c("measure", "measure_short")
+  ) |>
+  dplyr::mutate(
+    share_within_cluster = safe_ratio(estimate, cluster_total),
+    share_of_classified_30_69 = safe_ratio(estimate, classified_total_30_69),
+    share_of_all_causes_30_69 = safe_ratio(estimate, all_causes_30_69),
+    cluster_name = factor(cluster_name, levels = cluster_order),
+    measure_short = factor(
+      measure_short,
+      levels = c("Deaths", "YLLs", "YLDs", "DALYs")
+    )
+  ) |>
+  dplyr::arrange(measure_short, cluster_name, dplyr::desc(estimate))
+
+readr::write_csv(
+  cause_burden,
+  file.path(output_dir, "Part3_30_69_cause_burden_all.csv")
+)
+
+top10_causes <- cause_burden |>
+  dplyr::group_by(measure_short, cluster_name) |>
+  dplyr::slice_max(estimate, n = 10, with_ties = FALSE) |>
+  dplyr::arrange(measure_short, cluster_name, dplyr::desc(estimate)) |>
+  dplyr::mutate(rank_within_cluster = dplyr::row_number()) |>
+  dplyr::ungroup()
