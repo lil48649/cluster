@@ -198,3 +198,203 @@ if (anyDuplicated(cluster_membership$cause) > 0L) {
 }
 
 membership_counts <- cluster_membership |>
+  dplyr::count(cluster_name, name = "n") |>
+  dplyr::mutate(cluster_name = as.character(cluster_name))
+
+observed_counts <- stats::setNames(rep(0L, length(cluster_order)), cluster_order)
+observed_counts[membership_counts$cluster_name] <- membership_counts$n
+
+if (nrow(cluster_membership) != expected_n_clustered_causes) {
+  stop(
+    "Frozen membership contains ", nrow(cluster_membership),
+    " causes; expected ", expected_n_clustered_causes,
+    ". Do not continue until the final Stage 1 membership is reconciled."
+  )
+}
+
+if (!all(observed_counts == expected_cluster_counts[cluster_order])) {
+  stop(
+    "Frozen membership cluster counts do not match the finalized solution.\n",
+    "Observed: ",
+    paste(paste0(cluster_order, "=", observed_counts), collapse = "; "),
+    "\nExpected: ",
+    paste(
+      paste0(cluster_order, "=", expected_cluster_counts[cluster_order]),
+      collapse = "; "
+    )
+  )
+}
+
+readr::write_csv(
+  cluster_membership,
+  file.path(output_dir, "Part3_frozen_cluster_membership_used.csv")
+)
+
+# ------------------------------------------------------------------------------
+# 5. Read and validate GBD 2023 burden data
+# ------------------------------------------------------------------------------
+
+raw <- readr::read_csv(input_file, show_col_types = FALSE)
+
+required_columns <- c(
+  "population_group", "measure", "location", "sex", "age",
+  "cause", "metric", "year", "val", "upper", "lower"
+)
+
+missing_columns <- setdiff(required_columns, names(raw))
+if (length(missing_columns) > 0L) {
+  stop("Missing GBD columns: ", paste(missing_columns, collapse = ", "))
+}
+
+analysis_data <- raw |>
+  dplyr::filter(
+    population_group == "All Population",
+    location == "China",
+    sex == "Both",
+    year == 2023,
+    measure %in% measure_order,
+    metric %in% c("Number", "Rate"),
+    age %in% age_30_69
+  ) |>
+  dplyr::mutate(
+    age = factor(age, levels = age_30_69, ordered = TRUE),
+    age_index = as.integer(age),
+    age_midpoint = age_midpoints_30_69[age_index],
+    measure_short = unname(measure_short_lookup[measure])
+  )
+
+if (nrow(analysis_data) == 0L) {
+  stop("No China/Both/2023/30-69 rows remained after filtering.")
+}
+
+if (anyDuplicated(
+  analysis_data[c("measure", "age", "cause", "metric")]
+) > 0L) {
+  stop("Duplicate measure-age-cause-metric records found in GBD data.")
+}
+
+if (!all(measure_order %in% unique(analysis_data$measure))) {
+  stop(
+    "Missing measures: ",
+    paste(setdiff(measure_order, unique(analysis_data$measure)), collapse = ", ")
+  )
+}
+
+if (!all(age_30_69 %in% as.character(unique(analysis_data$age)))) {
+  stop(
+    "Missing 30-69 age groups: ",
+    paste(
+      setdiff(age_30_69, as.character(unique(analysis_data$age))),
+      collapse = ", "
+    )
+  )
+}
+
+# Confirm that every frozen cause appears somewhere in the 30-69 extract.
+missing_membership_causes <- setdiff(
+  cluster_membership$cause,
+  unique(analysis_data$cause)
+)
+
+if (length(missing_membership_causes) > 0L) {
+  stop(
+    "The GBD burden file is missing frozen cluster causes: ",
+    paste(missing_membership_causes, collapse = "; ")
+  )
+}
+
+# ------------------------------------------------------------------------------
+# 6. Infer the 2023 population denominators for each five-year age group
+# ------------------------------------------------------------------------------
+# GBD cause-specific rates are per 100,000. For any measure:
+#     population = Number / Rate * 100,000
+# The denominator should be the same for Deaths, YLLs, YLDs and DALYs.
+# We infer it independently from each All-causes measure and use the median.
+
+all_causes_age <- analysis_data |>
+  dplyr::filter(cause == "All causes") |>
+  dplyr::select(measure, measure_short, age, age_index, age_midpoint, metric, val) |>
+  tidyr::pivot_wider(names_from = metric, values_from = val)
+
+if (!all(c("Number", "Rate") %in% names(all_causes_age))) {
+  stop("All-causes Number and Rate are both required to infer population.")
+}
+
+population_candidates <- all_causes_age |>
+  dplyr::mutate(
+    population_implied = dplyr::if_else(
+      is.finite(Number) & is.finite(Rate) & Rate > 0,
+      Number / Rate * 100000,
+      NA_real_
+    )
+  )
+
+population_by_age <- population_candidates |>
+  dplyr::group_by(age, age_index, age_midpoint) |>
+  dplyr::summarise(
+    n_population_estimates = sum(is.finite(population_implied)),
+    population = stats::median(population_implied, na.rm = TRUE),
+    population_min = min(population_implied, na.rm = TRUE),
+    population_max = max(population_implied, na.rm = TRUE),
+    max_relative_deviation = max(
+      abs(population_implied - stats::median(population_implied, na.rm = TRUE)) /
+        stats::median(population_implied, na.rm = TRUE),
+      na.rm = TRUE
+    ),
+    .groups = "drop"
+  ) |>
+  dplyr::arrange(age_index)
+
+if (any(!is.finite(population_by_age$population))) {
+  stop("Failed to infer a finite population denominator for every 30-69 age group.")
+}
+
+population_30_69 <- sum(population_by_age$population)
+
+readr::write_csv(
+  population_candidates,
+  file.path(output_dir, "Part3_population_denominator_candidates.csv")
+)
+readr::write_csv(
+  population_by_age,
+  file.path(output_dir, "Part3_population_by_age_30_69.csv")
+)
+
+# ------------------------------------------------------------------------------
+# 7. Attach the frozen clusters to detailed causes
+# ------------------------------------------------------------------------------
+
+classified_data <- analysis_data |>
+  dplyr::filter(cause != "All causes") |>
+  dplyr::inner_join(cluster_membership, by = "cause") |>
+  dplyr::mutate(
+    cluster_name = factor(cluster_name, levels = cluster_order)
+  )
+
+# Audit which non-All-causes GBD rows are outside the frozen membership.
+unclassified_causes <- analysis_data |>
+  dplyr::filter(cause != "All causes") |>
+  dplyr::distinct(cause) |>
+  dplyr::anti_join(cluster_membership, by = "cause") |>
+  dplyr::arrange(cause)
+
+readr::write_csv(
+  unclassified_causes,
+  file.path(output_dir, "Part3_unclassified_GBD_causes.csv")
+)
+
+# ------------------------------------------------------------------------------
+# 8. 30-69 burden summary by cluster
+# ------------------------------------------------------------------------------
+
+cluster_number <- classified_data |>
+  dplyr::filter(metric == "Number") |>
+  dplyr::group_by(measure, measure_short, cluster_name) |>
+  dplyr::summarise(estimate = sum(val, na.rm = TRUE), .groups = "drop")
+
+all_causes_number <- analysis_data |>
+  dplyr::filter(metric == "Number", cause == "All causes") |>
+  dplyr::group_by(measure, measure_short) |>
+  dplyr::summarise(all_causes_30_69 = sum(val, na.rm = TRUE), .groups = "drop")
+
+classified_measure_totals <- cluster_number |>
