@@ -352,6 +352,11 @@ figure2_data <- classified_data |>
       "Deaths" = "Mortality",
       "YLDs (Years Lived with Disability)" = "Disability (YLD)"
     ),
+    # Explicit factor order keeps Mortality on the left and Disability on the right.
+    panel = factor(
+      panel,
+      levels = c("Mortality", "Disability (YLD)")
+    ),
     rate_per_person = rate_per_100k / 100000
   )
 
@@ -770,7 +775,7 @@ p5 <- ggplot2::ggplot(
     panel.grid.major.y = ggplot2::element_blank(),
     strip.background = ggplot2::element_rect(fill = "grey94", color = "grey75"),
     strip.text = ggplot2::element_text(face = "bold"),
-    plot.title = ggplot2::element_text(face = "bold", size = 15),
+    plot.title = ggplot2::element_text(face = "bold", size = 14),
     plot.subtitle = ggplot2::element_text(color = "grey35"),
     plot.caption = ggplot2::element_text(size = 8, color = "grey40", hjust = 0)
   )
@@ -778,7 +783,7 @@ p5 <- ggplot2::ggplot(
 save_plot_pair(
   p5,
   "Figure5_age30_69_top_DALY_causes_by_cluster",
-  width = 10.8,
+  width = 12.3,
   height = 12
 )
 
