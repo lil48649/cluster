@@ -516,6 +516,10 @@ readr::write_csv(
   file.path(output_dir, "Stage2_all_age_vs_30_69_closure.csv")
 )
 
+if (any(!is.finite(burden_comparison$share_of_classified))) {
+  stop("Non-finite burden shares detected before Figure 3.")
+}
+
 p3 <- ggplot2::ggplot(
   burden_comparison,
   ggplot2::aes(
@@ -546,9 +550,9 @@ p3 <- ggplot2::ggplot(
   ) +
   ggplot2::scale_y_continuous(
     labels = scales::percent_format(accuracy = 1),
-    limits = c(0, 1),
     expand = ggplot2::expansion(mult = c(0, 0.02))
   ) +
+  ggplot2::coord_cartesian(ylim = c(0, 1)) +
   ggplot2::labs(
     title = "Disease burden composition by age-profile cluster, China, 2023",
     subtitle = "Comparison of the national all-age burden with the 30–69-year public-health window",
@@ -751,6 +755,10 @@ readr::write_csv(
   file.path(output_dir, "Figure5_age30_69_top10_DALY_causes.csv")
 )
 
+if (any(!is.finite(top10_daly_30_69$estimate))) {
+  stop("Non-finite DALY estimates detected before Figure 5.")
+}
+
 p5 <- ggplot2::ggplot(
   top10_daly_30_69,
   ggplot2::aes(x = estimate, y = cause_panel, fill = cluster_name)
@@ -871,6 +879,10 @@ readr::write_csv(
   file.path(output_dir, "FigureS1_all_age_top10_DALY_causes.csv")
 )
 
+if (any(!is.finite(top10_daly_all_age$estimate))) {
+  stop("Non-finite all-age DALY estimates detected before Supplementary Figure S1.")
+}
+
 p_s1 <- ggplot2::ggplot(
   top10_daly_all_age,
   ggplot2::aes(x = estimate, y = cause_panel, fill = cluster_name)
@@ -969,23 +981,36 @@ save_plot_pair(
 # ------------------------------------------------------------------------------
 
 phenotype_long <- phenotype_30_69 |>
-  dplyr::select(cluster_name, YLL_fraction_of_DALYs, YLD_fraction_of_DALYs) |>
+  dplyr::mutate(
+    component_total = YLLs + YLDs,
+    YLL_share_of_components = safe_ratio(YLLs, component_total),
+    YLD_share_of_components = safe_ratio(YLDs, component_total)
+  ) |>
+  dplyr::select(
+    cluster_name,
+    YLL_share_of_components,
+    YLD_share_of_components
+  ) |>
   tidyr::pivot_longer(
-    cols = c(YLL_fraction_of_DALYs, YLD_fraction_of_DALYs),
+    cols = c(YLL_share_of_components, YLD_share_of_components),
     names_to = "component",
     values_to = "share"
   ) |>
   dplyr::mutate(
     component = dplyr::recode(
       component,
-      "YLL_fraction_of_DALYs" = "YLL (fatal burden)",
-      "YLD_fraction_of_DALYs" = "YLD (non-fatal burden)"
+      "YLL_share_of_components" = "YLL (fatal burden)",
+      "YLD_share_of_components" = "YLD (non-fatal burden)"
     ),
     component = factor(
       component,
       levels = c("YLL (fatal burden)", "YLD (non-fatal burden)")
     )
   )
+
+if (any(!is.finite(phenotype_long$share))) {
+  stop("Non-finite YLL/YLD component shares detected in Supplementary Figure S3.")
+}
 
 p_s3 <- ggplot2::ggplot(
   phenotype_long,
@@ -1001,15 +1026,18 @@ p_s3 <- ggplot2::ggplot(
   ) +
   ggplot2::scale_y_continuous(
     labels = scales::percent_format(accuracy = 1),
-    limits = c(0, 1),
     expand = ggplot2::expansion(mult = c(0, 0.02))
   ) +
+  ggplot2::coord_cartesian(ylim = c(0, 1)) +
   ggplot2::labs(
     title = "Fatal and non-fatal composition of DALYs by disease cluster, ages 30–69",
     x = NULL,
     y = "Share of DALYs",
     fill = NULL,
-    caption = "YLL/DALY and YLD/DALY are calculated from 2023 GBD numbers summed across ages 30–69."
+    caption = paste0(
+      "Stacked shares are normalized to YLL + YLD so that each cluster sums exactly to 100%; ",
+      "Table 1 retains the original YLL/DALY and YLD/DALY ratios."
+    )
   ) +
   ggplot2::theme_bw(base_size = 12) +
   ggplot2::theme(
