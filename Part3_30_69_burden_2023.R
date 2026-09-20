@@ -797,3 +797,217 @@ save_plot_pair(
 # ------------------------------------------------------------------------------
 
 p_s1 <- ggplot2::ggplot(
+  age_cluster_rates,
+  ggplot2::aes(
+    x = age_midpoint,
+    y = rate_per_100k,
+    color = cluster_name,
+    group = cluster_name
+  )
+) +
+  ggplot2::geom_line(linewidth = 1.05, lineend = "round") +
+  ggplot2::geom_point(size = 1.8) +
+  ggplot2::facet_wrap(~measure_short, scales = "free_y", ncol = 2) +
+  ggplot2::scale_color_manual(
+    values = cluster_colors,
+    breaks = cluster_order,
+    drop = FALSE
+  ) +
+  ggplot2::scale_x_continuous(
+    breaks = age_midpoints_30_69,
+    labels = age_30_69,
+    expand = ggplot2::expansion(mult = c(0.02, 0.02))
+  ) +
+  ggplot2::scale_y_continuous(labels = scales::label_number(big.mark = ",")) +
+  ggplot2::labs(
+    title = "Age-specific burden rates by disease cluster, ages 30–69 years, China, 2023",
+    subtitle = "Panels use separate y-axis scales",
+    x = "Age group",
+    y = "Rate per 100,000",
+    color = "Disease cluster",
+    caption = "Source: GBD 2023, Both sexes. Cause-specific rates are summed within each fixed disease cluster."
+  ) +
+  ggplot2::theme_bw(base_size = 11.5) +
+  ggplot2::theme(
+    legend.position = "bottom",
+    panel.grid.minor = ggplot2::element_blank(),
+    panel.grid.major = ggplot2::element_line(color = "grey92", linewidth = 0.4),
+    strip.background = ggplot2::element_rect(fill = "grey94", color = "grey75"),
+    strip.text = ggplot2::element_text(face = "bold"),
+    axis.text.x = ggplot2::element_text(angle = 45, hjust = 1),
+    plot.title = ggplot2::element_text(face = "bold", size = 15),
+    plot.subtitle = ggplot2::element_text(color = "grey35"),
+    plot.caption = ggplot2::element_text(size = 8, color = "grey40", hjust = 0)
+  )
+
+save_plot_pair(
+  p_s1,
+  "Part3_FigureS1_30_69_age_specific_cluster_rates",
+  width = 11,
+  height = 8
+)
+
+# ------------------------------------------------------------------------------
+# 16. Supplementary Figure S2 — YLL versus YLD composition of DALYs
+# ------------------------------------------------------------------------------
+
+phenotype_long <- phenotype |>
+  dplyr::select(cluster_name, YLL_fraction_of_DALYs, YLD_fraction_of_DALYs) |>
+  tidyr::pivot_longer(
+    cols = c(YLL_fraction_of_DALYs, YLD_fraction_of_DALYs),
+    names_to = "component",
+    values_to = "share"
+  ) |>
+  dplyr::mutate(
+    component = dplyr::recode(
+      component,
+      "YLL_fraction_of_DALYs" = "YLL (fatal burden)",
+      "YLD_fraction_of_DALYs" = "YLD (non-fatal burden)"
+    ),
+    component = factor(
+      component,
+      levels = c("YLL (fatal burden)", "YLD (non-fatal burden)")
+    )
+  )
+
+p_s2 <- ggplot2::ggplot(
+  phenotype_long,
+  ggplot2::aes(x = cluster_name, y = share, fill = component)
+) +
+  ggplot2::geom_col(width = 0.68, color = "white", linewidth = 0.3) +
+  ggplot2::geom_text(
+    ggplot2::aes(label = scales::percent(share, accuracy = 0.1)),
+    position = ggplot2::position_stack(vjust = 0.5),
+    color = "white",
+    fontface = "bold",
+    size = 3.4
+  ) +
+  ggplot2::scale_y_continuous(
+    labels = scales::percent_format(accuracy = 1),
+    expand = ggplot2::expansion(mult = c(0, 0.02))
+  ) +
+  ggplot2::labs(
+    title = "Fatal and non-fatal composition of DALYs by disease cluster, ages 30–69 years",
+    x = NULL,
+    y = "Share of DALYs",
+    fill = NULL,
+    caption = "YLL/DALY and YLD/DALY are calculated from 2023 GBD numbers summed across ages 30–69 years."
+  ) +
+  ggplot2::theme_bw(base_size = 12) +
+  ggplot2::theme(
+    legend.position = "bottom",
+    panel.grid.minor = ggplot2::element_blank(),
+    panel.grid.major.x = ggplot2::element_blank(),
+    plot.title = ggplot2::element_text(face = "bold", size = 15),
+    plot.caption = ggplot2::element_text(size = 8, color = "grey40", hjust = 0)
+  )
+
+save_plot_pair(
+  p_s2,
+  "Part3_FigureS2_30_69_YLL_YLD_DALY_profile",
+  width = 8.2,
+  height = 5.8
+)
+
+# ------------------------------------------------------------------------------
+# 17. Audit and RDS bundle
+# ------------------------------------------------------------------------------
+
+data_audit <- tibble::tibble(
+  check = c(
+    "input_file",
+    "membership_file",
+    "raw_rows",
+    "analysis_rows_30_69",
+    "frozen_clustered_causes",
+    "unclassified_GBD_causes",
+    "age_groups",
+    "measures",
+    "sex",
+    "year",
+    "population_30_69_inferred",
+    "max_population_denominator_relative_deviation"
+  ),
+  value = c(
+    input_file,
+    membership_file,
+    as.character(nrow(raw)),
+    as.character(nrow(analysis_data)),
+    as.character(nrow(cluster_membership)),
+    as.character(nrow(unclassified_causes)),
+    as.character(length(age_30_69)),
+    as.character(length(measure_order)),
+    "Both",
+    "2023",
+    format(population_30_69, scientific = FALSE, digits = 12),
+    format(
+      max(population_by_age$max_relative_deviation, na.rm = TRUE),
+      scientific = TRUE,
+      digits = 6
+    )
+  )
+)
+
+readr::write_csv(
+  data_audit,
+  file.path(output_dir, "Part3_30_69_data_audit.csv")
+)
+
+saveRDS(
+  list(
+    config = list(
+      input_file = input_file,
+      membership_file = membership_file,
+      age_groups = age_30_69,
+      cluster_order = cluster_order,
+      measures = measure_order,
+      sex = "Both",
+      year = 2023L
+    ),
+    membership = cluster_membership,
+    population_by_age = population_by_age,
+    closure = closure_30_69,
+    cluster_burden = cluster_burden,
+    cluster_burden_wide = cluster_burden_wide,
+    mortality_disability_profile = phenotype,
+    age_cluster_rates = age_cluster_rates,
+    age_cluster_shares = age_cluster_shares,
+    cause_burden = cause_burden,
+    top10_causes = top10_causes
+  ),
+  file.path(output_dir, "Part3_30_69_2023_analysis_objects.rds")
+)
+
+# Save session information for reproducibility.
+capture.output(
+  utils::sessionInfo(),
+  file = file.path(output_dir, "Part3_sessionInfo.txt")
+)
+
+# ------------------------------------------------------------------------------
+# 18. Console summary
+# ------------------------------------------------------------------------------
+
+cat("\n============================================================\n")
+cat("STAGE 2 / PART 1 COMPLETE: China age 30-69 burden, 2023\n")
+cat("============================================================\n")
+cat("Clustering rerun: NO\n")
+cat("Frozen clustered causes:", nrow(cluster_membership), "\n")
+cat("Population denominator (30-69):", format(round(population_30_69), big.mark = ","), "\n")
+cat("\nCluster counts:\n")
+print(membership_counts)
+cat("\n30-69 classified-to-All-causes closure:\n")
+print(closure_30_69)
+cat("\n30-69 cluster burden summary:\n")
+print(
+  cluster_burden |>
+    dplyr::select(
+      measure_short, cluster_name, estimate,
+      share_of_classified, share_of_all_causes,
+      crude_rate_per_100k_30_69
+    )
+)
+cat("\nMortality-disability phenotype:\n")
+print(phenotype)
+cat("\nOutputs saved to: ", normalizePath(output_dir), "\n", sep = "")
+cat("============================================================\n")
