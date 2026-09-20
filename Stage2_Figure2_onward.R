@@ -19,6 +19,7 @@
 #   Figure S1 All-age top DALY causes within each cluster
 #   Figure S2 30–69 age-specific rates for Deaths/YLLs/YLDs/DALYs
 #   Figure S3 30–69 fatal (YLL) vs non-fatal (YLD) DALY composition
+#   QC table  Stage1_excluded_12_causes_audit.csv documents the 304 -> 292 rule
 #
 # Required local inputs
 #   1) IHME-GBD_2023_DATA-26354bec-1.csv (or filename with '(1)')
@@ -43,7 +44,10 @@ membership_file_candidates <- c(
 
 output_dir <- "Stage2_Figure2_onward_outputs"
 
+expected_n_candidate_causes <- 304L
 expected_n_clustered_causes <- 292L
+expected_n_unclassified_causes <- 12L
+
 expected_cluster_counts <- c(
   "Infant" = 57L,
   "Adult" = 71L,
@@ -310,15 +314,160 @@ classified_data <- analysis_data |>
   )
 
 # Audit GBD causes not in the frozen 292-cause membership.
-unclassified_gbd_causes <- analysis_data |>
+# The source file contains 304 detailed causes. The finalized China clustering
+# includes 292 causes; the remaining 12 should have a completely flat all-zero
+# DALY-rate profile across the 22 mutually exclusive age groups. Such profiles
+# have SD = 0 and therefore cannot be meaningfully standardized within disease.
+
+candidate_gbd_causes <- analysis_data |>
   dplyr::filter(cause != "All causes") |>
   dplyr::distinct(cause) |>
+  dplyr::arrange(cause)
+
+if (nrow(candidate_gbd_causes) != expected_n_candidate_causes) {
+  stop(
+    "The burden file contains ", nrow(candidate_gbd_causes),
+    " detailed causes; expected ", expected_n_candidate_causes,
+    ". Reconcile the GBD cause selection before continuing."
+  )
+}
+
+unclassified_gbd_causes <- candidate_gbd_causes |>
   dplyr::anti_join(cluster_membership, by = "cause") |>
   dplyr::arrange(cause)
+
+if (nrow(unclassified_gbd_causes) != expected_n_unclassified_causes) {
+  stop(
+    "Found ", nrow(unclassified_gbd_causes),
+    " unclassified detailed causes; expected ", expected_n_unclassified_causes,
+    ". Reconcile Stage 1 membership before continuing."
+  )
+}
 
 readr::write_csv(
   unclassified_gbd_causes,
   file.path(output_dir, "Stage2_unclassified_GBD_causes.csv")
+)
+
+# Reconstruct the Stage 1 exclusion criterion directly from the Stage 2 GBD
+# export: China, Both sexes, 2023, DALYs, Rate, 22 mutually exclusive ages.
+excluded_daly_rate_grid <- analysis_data |>
+  dplyr::filter(
+    cause %in% unclassified_gbd_causes$cause,
+    measure == "DALYs (Disability-Adjusted Life Years)",
+    metric == "Rate",
+    age %in% age_levels
+  ) |>
+  dplyr::select(cause, age, val) |>
+  dplyr::mutate(age = as.character(age)) |>
+  tidyr::complete(
+    cause = unclassified_gbd_causes$cause,
+    age = age_levels
+  ) |>
+  dplyr::mutate(
+    val_filled_zero = tidyr::replace_na(val, 0)
+  )
+
+excluded_profile_audit <- excluded_daly_rate_grid |>
+  dplyr::group_by(cause) |>
+  dplyr::summarise(
+    age_cells_expected = length(age_levels),
+    age_cells_observed = sum(!is.na(val)),
+    missing_age_cells = sum(is.na(val)),
+    nonzero_age_cells = sum(val_filled_zero != 0),
+    min_DALY_rate_per_100k = min(val_filled_zero),
+    max_DALY_rate_per_100k = max(val_filled_zero),
+    mean_DALY_rate_per_100k = mean(val_filled_zero),
+    sd_DALY_rate_per_100k = stats::sd(val_filled_zero),
+    all_zero_DALY_rate = all(val_filled_zero == 0),
+    zero_standard_deviation = stats::sd(val_filled_zero) == 0,
+    .groups = "drop"
+  )
+
+# Add all-age and 30–69 DALY numbers for transparent burden auditing.
+excluded_daly_numbers <- analysis_data |>
+  dplyr::filter(
+    cause %in% unclassified_gbd_causes$cause,
+    measure == "DALYs (Disability-Adjusted Life Years)",
+    metric == "Number",
+    age %in% c("All ages", age_30_69)
+  ) |>
+  dplyr::mutate(
+    analysis_window = dplyr::if_else(
+      age == "All ages",
+      "All ages",
+      "Ages 30–69"
+    )
+  ) |>
+  dplyr::group_by(cause, analysis_window) |>
+  dplyr::summarise(DALY_number = sum(val, na.rm = TRUE), .groups = "drop") |>
+  tidyr::complete(
+    cause = unclassified_gbd_causes$cause,
+    analysis_window = c("All ages", "Ages 30–69"),
+    fill = list(DALY_number = 0)
+  ) |>
+  tidyr::pivot_wider(
+    names_from = analysis_window,
+    values_from = DALY_number,
+    names_prefix = "DALYs_"
+  ) |>
+  dplyr::rename(
+    DALYs_all_ages = `DALYs_All ages`,
+    DALYs_age30_69 = `DALYs_Ages 30–69`
+  )
+
+# Also verify that no all-age Number value is non-zero for any of the four
+# burden measures in these excluded causes.
+excluded_all_measure_check <- analysis_data |>
+  dplyr::filter(
+    cause %in% unclassified_gbd_causes$cause,
+    metric == "Number",
+    age == "All ages"
+  ) |>
+  dplyr::group_by(cause) |>
+  dplyr::summarise(
+    nonzero_all_age_measure_count = sum(val != 0, na.rm = TRUE),
+    max_abs_all_age_number = max(abs(val), na.rm = TRUE),
+    .groups = "drop"
+  )
+
+excluded_cause_audit <- excluded_profile_audit |>
+  dplyr::left_join(excluded_daly_numbers, by = "cause") |>
+  dplyr::left_join(excluded_all_measure_check, by = "cause") |>
+  dplyr::mutate(
+    exclusion_reason = dplyr::case_when(
+      missing_age_cells > 0 ~ "requires_review_missing_age_cells",
+      all_zero_DALY_rate & zero_standard_deviation ~
+        "all_zero_DALY_rate_across_22_ages",
+      zero_standard_deviation ~
+        "zero_standard_deviation_DALY_rate",
+      TRUE ~ "requires_review_nonzero_variable_profile"
+    )
+  ) |>
+  dplyr::arrange(cause)
+
+# The finalized 304 -> 292 exclusion should be entirely explained by 12
+# complete, all-zero, zero-variance DALY-rate profiles.
+unexpected_excluded <- excluded_cause_audit |>
+  dplyr::filter(
+    age_cells_observed != length(age_levels) |
+      missing_age_cells != 0 |
+      !all_zero_DALY_rate |
+      !zero_standard_deviation |
+      nonzero_all_age_measure_count != 0
+  )
+
+if (nrow(unexpected_excluded) > 0L) {
+  print(unexpected_excluded)
+  stop(
+    "One or more of the 12 unclassified causes do not meet the expected ",
+    "all-zero/zero-variance exclusion rule. Review the audit table."
+  )
+}
+
+readr::write_csv(
+  excluded_cause_audit,
+  file.path(output_dir, "Stage1_excluded_12_causes_audit.csv")
 )
 
 # ------------------------------------------------------------------------------
@@ -907,7 +1056,7 @@ p_s1 <- ggplot2::ggplot(
     panel.grid.major.y = ggplot2::element_blank(),
     strip.background = ggplot2::element_rect(fill = "grey94", color = "grey75"),
     strip.text = ggplot2::element_text(face = "bold"),
-    plot.title = ggplot2::element_text(face = "bold", size = 15),
+    plot.title = ggplot2::element_text(face = "bold", size = 14),
     plot.subtitle = ggplot2::element_text(color = "grey35"),
     plot.caption = ggplot2::element_text(size = 8, color = "grey40", hjust = 0)
   )
@@ -915,7 +1064,7 @@ p_s1 <- ggplot2::ggplot(
 save_plot_pair(
   p_s1,
   "FigureS1_all_age_top_DALY_causes_by_cluster",
-  width = 10.5,
+  width = 12.3,
   height = 12
 )
 
@@ -1065,8 +1214,10 @@ analysis_audit <- tibble::tibble(
     "membership_file",
     "raw_rows",
     "analysis_rows",
+    "candidate_detailed_causes",
     "frozen_clustered_causes",
     "unclassified_GBD_causes",
+    "excluded_all_zero_DALY_rate_causes",
     "all_age_groups_used",
     "age30_69_groups_used",
     "measures",
@@ -1078,8 +1229,10 @@ analysis_audit <- tibble::tibble(
     membership_file,
     as.character(nrow(raw)),
     as.character(nrow(analysis_data)),
+    as.character(nrow(candidate_gbd_causes)),
     as.character(nrow(cluster_membership)),
     as.character(nrow(unclassified_gbd_causes)),
+    as.character(sum(excluded_cause_audit$all_zero_DALY_rate)),
     as.character(length(age_levels)),
     as.character(length(age_30_69)),
     as.character(length(measure_order)),
@@ -1105,6 +1258,7 @@ saveRDS(
       age_30_69 = age_30_69
     ),
     membership = cluster_membership,
+    excluded_cause_audit = excluded_cause_audit,
     figure2_data = figure2_data,
     burden_comparison = burden_comparison,
     closure_windows = closure_windows,
@@ -1135,6 +1289,19 @@ cat("Clustering rerun: NO\n")
 cat("Frozen clustered causes:", nrow(cluster_membership), "\n")
 cat("\nCluster counts:\n")
 print(membership_counts)
+cat("\nExcluded-cause audit (304 candidate causes -> 292 clustered + 12 all-zero profiles):\n")
+print(
+  excluded_cause_audit |>
+    dplyr::select(
+      cause,
+      age_cells_observed,
+      nonzero_age_cells,
+      sd_DALY_rate_per_100k,
+      DALYs_all_ages,
+      DALYs_age30_69,
+      exclusion_reason
+    )
+)
 cat("\nAll-age vs 30–69 closure against GBD All causes:\n")
 print(closure_windows)
 cat("\n30–69 burden summary:\n")
