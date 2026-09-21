@@ -76,6 +76,8 @@ Place these seven CSVs in the working directory:
 
 Each batch should use the same settings: China, Both sexes, ages 30–34 through 65–69, Deaths/YLLs/YLDs/DALYs, Number + Rate, All causes plus all 304 detailed causes, and All Population.
 
+Because the export is restricted to ages 30–69, GBD is expected to omit **Sudden infant death syndrome** entirely: it has no applicable rows in this age window. Therefore the combined downloaded files contain **303 observed detailed causes**, not 304. This is expected. The script verifies that the only frozen Stage 1 cause absent from the download is Sudden infant death syndrome, restores its 30–69 cells as structural zeros, and continues to use the full frozen 292-cause cluster membership.
+
 The script automatically looks for the frozen membership in `Stage2_Figure2_onward_outputs/Stage2_frozen_cluster_membership_used.csv` first, then falls back to the original Stage 1 membership filenames.
 
 ### Part 3 main outputs
