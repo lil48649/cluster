@@ -144,7 +144,17 @@ decomposition_colors <- c(
   "Age-specific rates" = "#54A24B"
 )
 
-expected_n_detailed_causes <- 304L
+# Full GBD detailed-cause universe used in Stage 1.
+expected_n_detailed_causes_full <- 304L
+
+# In the age-restricted 30–69 GBD download, Sudden infant death syndrome has
+# no applicable age cells and is therefore omitted entirely by the download.
+# Thus the expected observed detailed-cause count is 303, not 304.
+expected_n_detailed_causes_age30_69_download <- 303L
+expected_age_window_absent_clustered_causes <- c(
+  "Sudden infant death syndrome"
+)
+
 expected_n_clustered_causes <- 292L
 expected_n_unclassified_causes <- 12L
 
@@ -564,6 +574,11 @@ readr::write_csv(
 
 # ------------------------------------------------------------------------------
 # 5. Combined-data QC and complete fixed 292-cause grid
+#
+# Note: the age-restricted GBD files are expected to contain 303 detailed
+# causes rather than 304 because Sudden infant death syndrome has no applicable
+# rows at ages 30–69 and is omitted entirely by the GBD export. It remains in
+# the frozen 292-cause membership and is restored as structural zero below.
 # ------------------------------------------------------------------------------
 
 if (!identical(
@@ -598,12 +613,51 @@ candidate_detailed_causes <- analysis_observed |>
   dplyr::distinct(cause) |>
   dplyr::arrange(cause)
 
-if (nrow(candidate_detailed_causes) != expected_n_detailed_causes) {
+if (
+  nrow(candidate_detailed_causes) !=
+    expected_n_detailed_causes_age30_69_download
+) {
   stop(
-    "Combined data contain ", nrow(candidate_detailed_causes),
-    " detailed causes; expected ", expected_n_detailed_causes, "."
+    "Combined age-30–69 data contain ", nrow(candidate_detailed_causes),
+    " detailed causes; expected ",
+    expected_n_detailed_causes_age30_69_download,
+    ". The full Stage 1 GBD universe contains ",
+    expected_n_detailed_causes_full,
+    " causes, but Sudden infant death syndrome is expected to be absent ",
+    "from a 30–69-only download because it has no applicable age cells."
   )
 }
+
+# A cause can be part of the frozen 292-cluster solution but be absent from the
+# 30–69-only download if GBD has no applicable rows at any selected age.
+missing_frozen_causes_from_download <- cluster_membership |>
+  dplyr::mutate(cluster_name = as.character(cluster_name)) |>
+  dplyr::anti_join(candidate_detailed_causes, by = "cause") |>
+  dplyr::arrange(cause)
+
+if (
+  !identical(
+    sort(missing_frozen_causes_from_download$cause),
+    sort(expected_age_window_absent_clustered_causes)
+  )
+) {
+  stop(
+    "Unexpected frozen cluster causes are absent from the 30–69 download. ",
+    "Observed absent causes: ",
+    paste(missing_frozen_causes_from_download$cause, collapse = "; "),
+    ". Expected: ",
+    paste(expected_age_window_absent_clustered_causes, collapse = "; "),
+    "."
+  )
+}
+
+readr::write_csv(
+  missing_frozen_causes_from_download,
+  file.path(
+    output_dir,
+    "Part3_frozen_causes_absent_from_age30_69_download.csv"
+  )
+)
 
 unclassified_causes <- candidate_detailed_causes |>
   dplyr::anti_join(cluster_membership, by = "cause") |>
@@ -1506,8 +1560,8 @@ p_s4 <- ggplot2::ggplot(
     y = NULL,
     color = "Disease cluster",
     caption = paste0(
-      "Standardized rates use the 2023 China 30–69 population age ",
-      "distribution as a fixed reference."
+      "Standardized rates use the GBD 2021 world population age standard, ",
+      "re-normalized within ages 30–69."
     )
   ) +
   ggplot2::theme_bw(base_size = 11.5) +
@@ -1692,8 +1746,10 @@ part3_audit <- tibble::tibble(
     "age_groups",
     "measures",
     "metrics",
-    "detailed_causes_in_download",
+    "full_GBD_detailed_cause_universe",
+    "detailed_causes_observed_in_age30_69_download",
     "frozen_clustered_causes",
+    "frozen_causes_absent_from_age30_69_download",
     "unclassified_causes",
     "cluster_Infant",
     "cluster_Adult",
@@ -1709,8 +1765,10 @@ part3_audit <- tibble::tibble(
     as.character(length(age_30_69)),
     as.character(length(measure_order)),
     "2",
+    as.character(expected_n_detailed_causes_full),
     as.character(nrow(candidate_detailed_causes)),
     as.character(nrow(cluster_membership)),
+    as.character(nrow(missing_frozen_causes_from_download)),
     as.character(nrow(unclassified_causes)),
     as.character(observed_cluster_counts["Infant"]),
     as.character(observed_cluster_counts["Adult"]),
@@ -1751,6 +1809,8 @@ saveRDS(
         "GBD 2021 world population age standard, re-normalized within ages 30–69"
     ),
     membership = cluster_membership,
+    missing_frozen_causes_from_download =
+      missing_frozen_causes_from_download,
     batch_audit = batch_audit,
     missing_classified_cells = missing_classified_cells,
     population_by_age = population_by_age,
@@ -1779,7 +1839,21 @@ cat("PART 3 COMPLETE: China age 30–69 trends, 1990–2023\n")
 cat("============================================================\n")
 cat("Clustering rerun: NO\n")
 cat("Years:", min(years_expected), "to", max(years_expected), "\n")
+cat("Full GBD detailed-cause universe:", expected_n_detailed_causes_full, "\n")
+cat(
+  "Detailed causes observed in the 30–69 download:",
+  nrow(candidate_detailed_causes),
+  "\n"
+)
 cat("Frozen clustered causes:", nrow(cluster_membership), "\n")
+cat(
+  "Frozen causes absent from the 30–69 download:",
+  nrow(missing_frozen_causes_from_download),
+  " (",
+  paste(missing_frozen_causes_from_download$cause, collapse = "; "),
+  ")\n",
+  sep = ""
+)
 cat("Unclassified 2023-zero causes:", nrow(unclassified_causes), "\n")
 
 cat("\nFrozen cluster counts:\n")
