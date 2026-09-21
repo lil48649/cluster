@@ -90,4 +90,8 @@ The script automatically looks for the frozen membership in `Stage2_Figure2_onwa
 
 ### Rate standardization
 
-Because the downloaded data contain eight age-specific rates rather than a pre-computed 30–69 age-standardized rate, Part 3 uses direct standardization with the **2023 China age distribution within ages 30–69** as a fixed internal standard. These rates are intended for within-China temporal comparisons and should not be described as GBD global age-standardized rates.
+Because the downloaded data contain eight age-specific rates rather than a pre-computed 30–69 age-standardized rate, Part 3 uses direct standardization with the **GBD 2021 world population age standard**. The published GBD standard percentages for ages 30–34 through 65–69 are:
+
+7.32171, 6.82805, 6.14735, 5.51133, 4.91312, 4.34586, 3.68223 and 2.98509.
+
+These eight weights sum to 41.73474% of the full GBD standard population. Because the analysis is deliberately restricted to ages 30–69, the script re-normalizes these eight weights to sum to 1 before calculating the directly age-standardized 30–69 rate.
