@@ -38,9 +38,12 @@
 # Standardized rates
 #   The GBD download contains eight age-specific rates rather than a pre-computed
 #   30–69 age-standardized rate. This script therefore performs direct
-#   standardization using the 2023 China 30–69 population age distribution as
-#   a fixed internal standard. This is appropriate for within-China temporal
-#   comparison, but it is NOT the GBD global age-standardized rate.
+#   standardization using the GBD 2021 world population age standard.
+#
+#   For the restricted 30–69-year analysis window, the official GBD standard
+#   weights for ages 30–34 through 65–69 are re-normalized to sum to 1 across
+#   these eight included age groups. The resulting rate is the directly
+#   age-standardized 30–69 rate under the GBD 2021 world age standard.
 #
 # Decomposition
 #   Burden = total population × age share × age-specific rate.
@@ -92,6 +95,27 @@ age_30_69 <- c(
 )
 
 age_midpoints_30_69 <- c(32, 37, 42, 47, 52, 57, 62, 67)
+
+# GBD 2021 world population age standard: exact "Percent of Population"
+# values for the eight age groups included in the 30–69 analysis.
+# Source: GBD 2021 Appendix Table S14.
+gbd2021_world_standard_percent_30_69 <- c(
+  7.32171,  # 30-34 years
+  6.82805,  # 35-39 years
+  6.14735,  # 40-44 years
+  5.51133,  # 45-49 years
+  4.91312,  # 50-54 years
+  4.34586,  # 55-59 years
+  3.68223,  # 60-64 years
+  2.98509   # 65-69 years
+)
+
+if (
+  length(gbd2021_world_standard_percent_30_69) !=
+    length(age_30_69)
+) {
+  stop("GBD 2021 standard-weight vector does not match the eight age groups.")
+}
 
 measure_order <- c(
   "Deaths",
@@ -813,28 +837,46 @@ population_total <- population_by_age |>
     .groups = "drop"
   )
 
-# Fixed standard weights = China's 2023 age distribution within ages 30–69.
-standard_weights <- population_by_age |>
-  dplyr::filter(year == 2023) |>
+# GBD 2021 world population age-standard weights for ages 30–69.
+#
+# The published percentages are defined relative to the full GBD world standard
+# population. Because this study deliberately restricts the standardized rate
+# to ages 30–69, the eight included weights are re-normalized to sum to 1.
+# Their unnormalized total is retained for auditing.
+standard_weights <- tibble::tibble(
+  age = factor(age_30_69, levels = age_30_69, ordered = TRUE),
+  age_index = seq_along(age_30_69),
+  age_midpoint = age_midpoints_30_69,
+  gbd2021_world_standard_percent =
+    gbd2021_world_standard_percent_30_69
+) |>
   dplyr::mutate(
-    standard_weight = population / sum(population)
-  ) |>
-  dplyr::select(
-    age,
-    age_index,
-    age_midpoint,
-    population_2023 = population,
-    standard_weight
-  ) |>
-  dplyr::arrange(age_index)
+    gbd2021_30_69_percent_total =
+      sum(gbd2021_world_standard_percent),
+    standard_weight =
+      gbd2021_world_standard_percent /
+      gbd2021_30_69_percent_total
+  )
+
+if (
+  abs(
+    unique(standard_weights$gbd2021_30_69_percent_total) -
+      41.73474
+  ) > 1e-8
+) {
+  stop("Unexpected sum of GBD 2021 world-standard percentages for ages 30–69.")
+}
 
 if (abs(sum(standard_weights$standard_weight) - 1) > 1e-12) {
-  stop("Standard age weights do not sum to 1.")
+  stop("Re-normalized GBD 2021 standard age weights do not sum to 1.")
 }
 
 readr::write_csv(
   standard_weights,
-  file.path(output_dir, "Part3_standard_weights_2023China_age30_69.csv")
+  file.path(
+    output_dir,
+    "Part3_standard_weights_GBD2021_world_age30_69.csv"
+  )
 )
 
 # ------------------------------------------------------------------------------
@@ -887,7 +929,7 @@ standardized_cluster_rates <- age_cluster_rates |>
     year, measure, measure_short, cluster_name
   ) |>
   dplyr::summarise(
-    standardized_rate_per_100k_2023China =
+    standardized_rate_per_100k_GBD2021 =
       sum(rate_per_100k * standard_weight),
     .groups = "drop"
   )
@@ -1001,7 +1043,7 @@ for (i in seq_len(nrow(trend_keys))) {
 
   eapc <- fit_eapc(
     d$year,
-    d$standardized_rate_per_100k_2023China
+    d$standardized_rate_per_100k_GBD2021
   )
 
   trend_rows[[i]] <- tibble::tibble(
@@ -1024,13 +1066,13 @@ for (i in seq_len(nrow(trend_keys))) {
       ),
 
     standardized_rate_1990 =
-      d1990$standardized_rate_per_100k_2023China,
+      d1990$standardized_rate_per_100k_GBD2021,
     standardized_rate_2023 =
-      d2023$standardized_rate_per_100k_2023China,
+      d2023$standardized_rate_per_100k_GBD2021,
     standardized_rate_percent_change =
       percent_change(
-        d1990$standardized_rate_per_100k_2023China,
-        d2023$standardized_rate_per_100k_2023China
+        d1990$standardized_rate_per_100k_GBD2021,
+        d2023$standardized_rate_per_100k_GBD2021
       ),
 
     share_of_classified_1990 = d1990$share_of_classified,
@@ -1074,7 +1116,7 @@ figure6_data <- cluster_summary |>
     cluster_name,
     number_millions = number / 1e6,
     standardized_rate =
-      standardized_rate_per_100k_2023China
+      standardized_rate_per_100k_GBD2021
   ) |>
   tidyr::pivot_longer(
     cols = c(number_millions, standardized_rate),
@@ -1134,7 +1176,7 @@ p6 <- ggplot2::ggplot(
     title = "Trends in disease-cluster burden among adults aged 30–69 years, China, 1990–2023",
     subtitle = paste0(
       "Numbers and directly standardized rates; standardized rates use the ",
-      "2023 China 30–69 age distribution as a fixed reference"
+      "GBD 2021 world population age standard, re-normalized to ages 30–69"
     ),
     x = "Year",
     y = NULL,
@@ -1402,7 +1444,7 @@ figure_s4_data <- cluster_summary |>
     cluster_name,
     number_millions = number / 1e6,
     standardized_rate =
-      standardized_rate_per_100k_2023China
+      standardized_rate_per_100k_GBD2021
   ) |>
   tidyr::pivot_longer(
     cols = c(number_millions, standardized_rate),
@@ -1658,7 +1700,8 @@ part3_audit <- tibble::tibble(
     "cluster_Aging_related",
     "missing_classified_cells_filled_zero",
     "max_population_relative_deviation",
-    "standard_weight_sum"
+    "GBD2021_world_standard_percent_sum_age30_69",
+    "standard_weight_sum_after_renormalization"
   ),
   value = c(
     as.character(length(input_files)),
@@ -1677,6 +1720,11 @@ part3_audit <- tibble::tibble(
       max(population_by_age$max_relative_deviation, na.rm = TRUE),
       scientific = TRUE,
       digits = 6
+    ),
+    format(
+      unique(standard_weights$gbd2021_30_69_percent_total),
+      scientific = FALSE,
+      digits = 12
     ),
     format(
       sum(standard_weights$standard_weight),
@@ -1700,7 +1748,7 @@ saveRDS(
       age_groups = age_30_69,
       cluster_order = cluster_order,
       standard_population =
-        "China 2023 population distribution within ages 30–69"
+        "GBD 2021 world population age standard, re-normalized within ages 30–69"
     ),
     membership = cluster_membership,
     batch_audit = batch_audit,
@@ -1737,7 +1785,7 @@ cat("Unclassified 2023-zero causes:", nrow(unclassified_causes), "\n")
 cat("\nFrozen cluster counts:\n")
 print(membership_counts)
 
-cat("\n2023 China 30–69 standard weights:\n")
+cat("\nGBD 2021 world-standard weights for ages 30–69 (re-normalized):\n")
 print(standard_weights)
 
 cat("\n1990 vs 2023 trend table:\n")
