@@ -1,31 +1,67 @@
 #!/usr/bin/env Rscript
 
 # ==============================================================================
-# China GBD 2023 disease age-profile clusters — Stage 2
-# Figures 2 onward: all-age bridge -> ages 30–69 public-health analysis
+# China GBD 2023 disease age-profile clusters — Stage 2 (redesigned)
+# Health loss within the 30–69-year premature-mortality monitoring age window
 #
-# IMPORTANT METHOD RULE
-#   This script NEVER reruns K-means++.
-#   It reads the frozen Stage 1 k=3 disease membership and applies it to GBD 2023
-#   Deaths, YLLs, YLDs and DALYs.
+# SCIENTIFIC ROLE OF THIS STAGE
+#   Stage 1 identified three life-course disease-burden phenotypes from the
+#   full-age 2023 DALY-rate trajectories:
+#     Infant / Adult / Aging-related.
 #
-# Main-text figure plan
-#   Figure 2  All-age age-specific mortality and YLD rates by cluster
-#   Figure 3  All-age vs ages 30–69 burden composition
-#   Figure 4  Cluster contribution across 30–69 five-year age groups
-#   Figure 5  Leading DALY causes within each cluster at ages 30–69
+#   Stage 2 does NOT rerun clustering. It asks a narrower question:
 #
-# Supplementary outputs
-#   Figure S1 All-age top DALY causes within each cluster
-#   Figure S2 30–69 age-specific rates for Deaths/YLLs/YLDs/DALYs
-#   Figure S3 30–69 fatal (YLL) vs non-fatal (YLD) DALY composition
-#   QC table  Stage1_excluded_12_causes_audit.csv documents the 304 -> 292 rule
+#     To what extent do these independently defined life-course phenotypes
+#     already generate health loss at ages 30–69 years?
 #
-# Required local inputs
-#   1) IHME-GBD_2023_DATA-26354bec-1.csv (or filename with '(1)')
-#   2) Figure1_k3_cluster_membership.csv OR Part2_cluster_membership.csv
+#   Ages 30–69 are used because they correspond to the age range used in
+#   monitoring premature NCD mortality between exact ages 30 and 70.
+#   IMPORTANT: DALYs at ages 30–69 are broader fatal + non-fatal health loss;
+#   they are NOT the SDG 3.4.1 probability of premature death.
 #
-# The analysis uses China, Both sexes, 2023 only.
+# CORE QUESTIONS
+#   Q1. Who accounts for health loss in the 30–69-year window?
+#       -> share of classified DALYs at ages 30–69 by disease cluster.
+#
+#   Q2. How much of each cluster's own all-age DALY burden has already occurred
+#       at ages 30–69?
+#       -> DALYs ages 30–69 / all-age DALYs within the same cluster.
+#
+#   Q3. How does cluster contribution change across ages 30–34 to 65–69?
+#       -> age-specific DALY-rate composition.
+#
+# SUPPORTING CHARACTERISATION
+#   - YLL versus YLD composition at ages 30–69.
+#   - Leading 30–69 DALY causes within each cluster.
+#
+# MAIN-TEXT OUTPUTS
+#   Figure 2  Two complementary views of DALY burden at ages 30–69:
+#             A) cluster share of classified 30–69 DALYs;
+#             B) proportion of each cluster's all-age DALYs occurring at 30–69.
+#
+#   Figure 3  Age gradient in DALY composition from 30–34 to 65–69 years.
+#
+#   Table 1   Core cluster summary:
+#             all-age DALYs, 30–69 DALYs, 30–69 composition,
+#             within-cluster 30–69/all-age fraction, YLL/YLD phenotype.
+#
+# SUPPLEMENTARY OUTPUTS
+#   Figure S1  Fatal (YLL) vs non-fatal (YLD) composition at ages 30–69.
+#   Figure S2  Top 10 DALY causes within each cluster at ages 30–69.
+#   Table S1   Full Deaths/YLL/YLD/DALY cluster burden at ages 30–69.
+#
+# QC OUTPUTS
+#   - Frozen membership used.
+#   - 304 -> 292 Stage 1 exclusion audit.
+#   - Classified-cause closure against GBD All causes.
+#
+# REQUIRED LOCAL INPUTS
+#   1) IHME-GBD_2023_DATA-26354bec-1.csv
+#      OR IHME-GBD_2023_DATA-26354bec-1(1).csv
+#   2) Figure1_k3_cluster_membership.csv
+#      OR Part2_cluster_membership.csv
+#
+# The analysis uses China, Both sexes, 2023.
 # ==============================================================================
 
 # ------------------------------------------------------------------------------
@@ -39,10 +75,13 @@ input_file_candidates <- c(
 
 membership_file_candidates <- c(
   "Figure1_k3_cluster_membership.csv",
-  "Part2_cluster_membership.csv"
+  "Part2_cluster_membership.csv",
+  "Stage2_frozen_cluster_membership_used.csv"
 )
 
-output_dir <- "Stage2_Figure2_onward_outputs"
+# A new output folder is used so that the redesigned Stage 2 results cannot be
+# confused with files created by the earlier, broader Stage 2 script.
+output_dir <- "Stage2_Redesigned_30_69_outputs"
 
 expected_n_candidate_causes <- 304L
 expected_n_clustered_causes <- 292L
@@ -72,7 +111,6 @@ age_levels <- c(
   "95+ years"
 )
 
-# Used for plotting only.
 age_midpoints <- c(0.5, 1.5, 3.5, seq(7, 92, by = 5), 97.5)
 stopifnot(length(age_levels) == length(age_midpoints))
 
@@ -97,6 +135,10 @@ measure_short_lookup <- c(
   "DALYs (Disability-Adjusted Life Years)" = "DALYs"
 )
 
+daly_measure <- "DALYs (Disability-Adjusted Life Years)"
+yll_measure <- "YLLs (Years of Life Lost)"
+yld_measure <- "YLDs (Years Lived with Disability)"
+
 # ------------------------------------------------------------------------------
 # 1. Package checks
 # ------------------------------------------------------------------------------
@@ -111,9 +153,11 @@ missing_packages <- required_packages[
 
 if (length(missing_packages) > 0L) {
   stop(
-    "Missing R packages: ", paste(missing_packages, collapse = ", "),
+    "Missing R packages: ",
+    paste(missing_packages, collapse = ", "),
     "\nInstall them first, e.g. install.packages(c(",
-    paste(sprintf('"%s"', missing_packages), collapse = ", "), "))"
+    paste(sprintf('"%s"', missing_packages), collapse = ", "),
+    "))"
   )
 }
 
@@ -123,13 +167,20 @@ if (length(missing_packages) > 0L) {
 
 first_existing_file <- function(candidates, label) {
   hit <- candidates[file.exists(candidates)]
+
   if (length(hit) == 0L) {
     stop(
-      label, " not found. Looked for:\n  ",
+      label,
+      " not found. Looked for:\n  ",
       paste(candidates, collapse = "\n  ")
     )
   }
+
   hit[[1L]]
+}
+
+safe_ratio <- function(num, den) {
+  ifelse(is.finite(den) & den != 0, num / den, NA_real_)
 }
 
 save_plot_pair <- function(plot_object, stem, width, height) {
@@ -143,7 +194,6 @@ save_plot_pair <- function(plot_object, stem, width, height) {
     bg = "white"
   )
 
-  # Standard PDF device is used for portability across Windows/macOS/Linux.
   ggplot2::ggsave(
     filename = file.path(output_dir, paste0(stem, ".pdf")),
     plot = plot_object,
@@ -154,15 +204,15 @@ save_plot_pair <- function(plot_object, stem, width, height) {
   )
 }
 
-safe_ratio <- function(num, den) {
-  ifelse(is.finite(den) & den != 0, num / den, NA_real_)
-}
-
 # ------------------------------------------------------------------------------
-# 3. Locate input files
+# 3. Locate inputs
 # ------------------------------------------------------------------------------
 
-input_file <- first_existing_file(input_file_candidates, "GBD 2023 burden file")
+input_file <- first_existing_file(
+  input_file_candidates,
+  "GBD 2023 burden file"
+)
+
 membership_file <- first_existing_file(
   membership_file_candidates,
   "Frozen Stage 1 cluster-membership file"
@@ -172,20 +222,35 @@ dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
 
 message("Using burden data: ", input_file)
 message("Using frozen cluster membership: ", membership_file)
-message("Output directory: ", normalizePath(output_dir, mustWork = FALSE))
+message(
+  "Output directory: ",
+  normalizePath(output_dir, mustWork = FALSE)
+)
 
 # ------------------------------------------------------------------------------
-# 4. Read and validate the frozen k=3 membership
+# 4. Read and validate frozen Stage 1 membership
 # ------------------------------------------------------------------------------
 
-membership_raw <- readr::read_csv(membership_file, show_col_types = FALSE)
+membership_raw <- readr::read_csv(
+  membership_file,
+  show_col_types = FALSE
+)
 
-if ("disease" %in% names(membership_raw) && !"cause" %in% names(membership_raw)) {
-  membership_raw <- dplyr::rename(membership_raw, cause = disease)
+if (
+  "disease" %in% names(membership_raw) &&
+    !"cause" %in% names(membership_raw)
+) {
+  membership_raw <- dplyr::rename(
+    membership_raw,
+    cause = disease
+  )
 }
 
 required_membership_columns <- c("cause", "cluster_name")
-missing_membership_columns <- setdiff(required_membership_columns, names(membership_raw))
+missing_membership_columns <- setdiff(
+  required_membership_columns,
+  names(membership_raw)
+)
 
 if (length(missing_membership_columns) > 0L) {
   stop(
@@ -201,40 +266,72 @@ cluster_membership <- membership_raw |>
   ) |>
   dplyr::distinct(cause, .keep_all = TRUE) |>
   dplyr::mutate(
-    cluster_name = factor(cluster_name, levels = cluster_order)
+    cluster_name = factor(
+      cluster_name,
+      levels = cluster_order
+    )
   ) |>
   dplyr::arrange(cluster_name, cause)
 
 if (any(is.na(cluster_membership$cluster_name))) {
-  stop("Unexpected cluster labels were found in the frozen membership file.")
+  stop(
+    "Unexpected cluster labels were found in the frozen membership file."
+  )
 }
 
 if (anyDuplicated(cluster_membership$cause) > 0L) {
-  stop("Duplicate causes were found in the frozen membership file.")
+  stop(
+    "Duplicate causes were found in the frozen membership file."
+  )
 }
 
 membership_counts <- cluster_membership |>
   dplyr::count(cluster_name, name = "n") |>
-  dplyr::mutate(cluster_name = as.character(cluster_name))
+  dplyr::mutate(
+    cluster_name = as.character(cluster_name)
+  )
 
-observed_counts <- stats::setNames(rep(0L, length(cluster_order)), cluster_order)
-observed_counts[membership_counts$cluster_name] <- membership_counts$n
+observed_counts <- stats::setNames(
+  rep(0L, length(cluster_order)),
+  cluster_order
+)
+
+observed_counts[membership_counts$cluster_name] <-
+  membership_counts$n
 
 if (nrow(cluster_membership) != expected_n_clustered_causes) {
   stop(
-    "Frozen membership contains ", nrow(cluster_membership),
-    " causes; expected ", expected_n_clustered_causes,
+    "Frozen membership contains ",
+    nrow(cluster_membership),
+    " causes; expected ",
+    expected_n_clustered_causes,
     ". Reconcile Stage 1 before continuing."
   )
 }
 
-if (!all(observed_counts == expected_cluster_counts[cluster_order])) {
+if (
+  !all(
+    observed_counts[cluster_order] ==
+      expected_cluster_counts[cluster_order]
+  )
+) {
   stop(
     "Frozen cluster sizes do not match the finalized solution.\nObserved: ",
-    paste(paste0(cluster_order, "=", observed_counts), collapse = "; "),
+    paste(
+      paste0(
+        cluster_order,
+        "=",
+        observed_counts[cluster_order]
+      ),
+      collapse = "; "
+    ),
     "\nExpected: ",
     paste(
-      paste0(cluster_order, "=", expected_cluster_counts[cluster_order]),
+      paste0(
+        cluster_order,
+        "=",
+        expected_cluster_counts[cluster_order]
+      ),
       collapse = "; "
     )
   )
@@ -242,23 +339,36 @@ if (!all(observed_counts == expected_cluster_counts[cluster_order])) {
 
 readr::write_csv(
   cluster_membership,
-  file.path(output_dir, "Stage2_frozen_cluster_membership_used.csv")
+  file.path(
+    output_dir,
+    "Stage2_frozen_cluster_membership_used.csv"
+  )
 )
 
 # ------------------------------------------------------------------------------
-# 5. Read and validate the GBD 2023 burden data
+# 5. Read and validate GBD 2023 burden data
 # ------------------------------------------------------------------------------
 
-raw <- readr::read_csv(input_file, show_col_types = FALSE)
+raw <- readr::read_csv(
+  input_file,
+  show_col_types = FALSE
+)
 
 required_columns <- c(
   "population_group", "measure", "location", "sex", "age",
   "cause", "metric", "year", "val", "upper", "lower"
 )
 
-missing_columns <- setdiff(required_columns, names(raw))
+missing_columns <- setdiff(
+  required_columns,
+  names(raw)
+)
+
 if (length(missing_columns) > 0L) {
-  stop("Missing GBD columns: ", paste(missing_columns, collapse = ", "))
+  stop(
+    "Missing GBD columns: ",
+    paste(missing_columns, collapse = ", ")
+  )
 }
 
 analysis_data <- raw |>
@@ -272,100 +382,161 @@ analysis_data <- raw |>
     age %in% c("All ages", age_levels)
   ) |>
   dplyr::mutate(
-    measure_short = unname(measure_short_lookup[measure])
+    measure_short = unname(
+      measure_short_lookup[measure]
+    )
   )
 
 if (nrow(analysis_data) == 0L) {
-  stop("No China/Both/2023 burden rows remained after filtering.")
+  stop(
+    "No China/Both/2023 burden rows remained after filtering."
+  )
 }
 
-if (anyDuplicated(analysis_data[c("measure", "age", "cause", "metric")]) > 0L) {
-  stop("Duplicate measure-age-cause-metric records were found in the GBD data.")
+if (
+  anyDuplicated(
+    analysis_data[
+      c("measure", "age", "cause", "metric")
+    ]
+  ) > 0L
+) {
+  stop(
+    "Duplicate measure-age-cause-metric records were found in the GBD data."
+  )
 }
 
-if (!all(measure_order %in% unique(analysis_data$measure))) {
+if (
+  !all(
+    measure_order %in%
+      unique(analysis_data$measure)
+  )
+) {
   stop(
     "Missing measures: ",
-    paste(setdiff(measure_order, unique(analysis_data$measure)), collapse = ", ")
+    paste(
+      setdiff(
+        measure_order,
+        unique(analysis_data$measure)
+      ),
+      collapse = ", "
+    )
   )
 }
 
-if (!all(c("All ages", age_levels) %in% unique(analysis_data$age))) {
+if (
+  !all(
+    c("All ages", age_levels) %in%
+      unique(analysis_data$age)
+  )
+) {
   stop(
     "Missing age groups: ",
-    paste(setdiff(c("All ages", age_levels), unique(analysis_data$age)), collapse = ", ")
+    paste(
+      setdiff(
+        c("All ages", age_levels),
+        unique(analysis_data$age)
+      ),
+      collapse = ", "
+    )
   )
 }
 
-missing_cluster_causes <- setdiff(cluster_membership$cause, unique(analysis_data$cause))
+missing_cluster_causes <- setdiff(
+  cluster_membership$cause,
+  unique(analysis_data$cause)
+)
+
 if (length(missing_cluster_causes) > 0L) {
   stop(
     "The burden file is missing frozen Stage 1 causes: ",
-    paste(missing_cluster_causes, collapse = "; ")
+    paste(
+      missing_cluster_causes,
+      collapse = "; "
+    )
   )
 }
 
-# Detailed rows used in cluster summaries. Cluster assignment is frozen.
 classified_data <- analysis_data |>
-  dplyr::filter(cause != "All causes") |>
-  dplyr::inner_join(cluster_membership, by = "cause") |>
+  dplyr::filter(
+    cause != "All causes"
+  ) |>
+  dplyr::inner_join(
+    cluster_membership,
+    by = "cause"
+  ) |>
   dplyr::mutate(
-    cluster_name = factor(cluster_name, levels = cluster_order)
+    cluster_name = factor(
+      cluster_name,
+      levels = cluster_order
+    )
   )
 
-# Audit GBD causes not in the frozen 292-cause membership.
-# The source file contains 304 detailed causes. The finalized China clustering
-# includes 292 causes; the remaining 12 should have a completely flat all-zero
-# DALY-rate profile across the 22 mutually exclusive age groups. Such profiles
-# have SD = 0 and therefore cannot be meaningfully standardized within disease.
+# ------------------------------------------------------------------------------
+# 6. Re-audit the Stage 1 304 -> 292 exclusion rule
+# ------------------------------------------------------------------------------
 
 candidate_gbd_causes <- analysis_data |>
-  dplyr::filter(cause != "All causes") |>
+  dplyr::filter(
+    cause != "All causes"
+  ) |>
   dplyr::distinct(cause) |>
   dplyr::arrange(cause)
 
-if (nrow(candidate_gbd_causes) != expected_n_candidate_causes) {
+if (
+  nrow(candidate_gbd_causes) !=
+    expected_n_candidate_causes
+) {
   stop(
-    "The burden file contains ", nrow(candidate_gbd_causes),
-    " detailed causes; expected ", expected_n_candidate_causes,
+    "The burden file contains ",
+    nrow(candidate_gbd_causes),
+    " detailed causes; expected ",
+    expected_n_candidate_causes,
     ". Reconcile the GBD cause selection before continuing."
   )
 }
 
 unclassified_gbd_causes <- candidate_gbd_causes |>
-  dplyr::anti_join(cluster_membership, by = "cause") |>
+  dplyr::anti_join(
+    cluster_membership,
+    by = "cause"
+  ) |>
   dplyr::arrange(cause)
 
-if (nrow(unclassified_gbd_causes) != expected_n_unclassified_causes) {
+if (
+  nrow(unclassified_gbd_causes) !=
+    expected_n_unclassified_causes
+) {
   stop(
-    "Found ", nrow(unclassified_gbd_causes),
-    " unclassified detailed causes; expected ", expected_n_unclassified_causes,
+    "Found ",
+    nrow(unclassified_gbd_causes),
+    " unclassified detailed causes; expected ",
+    expected_n_unclassified_causes,
     ". Reconcile Stage 1 membership before continuing."
   )
 }
 
-readr::write_csv(
-  unclassified_gbd_causes,
-  file.path(output_dir, "Stage2_unclassified_GBD_causes.csv")
-)
-
-# Reconstruct the Stage 1 exclusion criterion directly from the Stage 2 GBD
-# export: China, Both sexes, 2023, DALYs, Rate, 22 mutually exclusive ages.
 excluded_daly_rate_grid <- analysis_data |>
   dplyr::filter(
     cause %in% unclassified_gbd_causes$cause,
-    measure == "DALYs (Disability-Adjusted Life Years)",
+    measure == daly_measure,
     metric == "Rate",
     age %in% age_levels
   ) |>
-  dplyr::select(cause, age, val) |>
-  dplyr::mutate(age = as.character(age)) |>
+  dplyr::select(
+    cause,
+    age,
+    val
+  ) |>
+  dplyr::mutate(
+    age = as.character(age)
+  ) |>
   tidyr::complete(
     cause = unclassified_gbd_causes$cause,
     age = age_levels
   ) |>
   dplyr::mutate(
-    val_filled_zero = tidyr::replace_na(val, 0)
+    val_filled_zero =
+      tidyr::replace_na(val, 0)
   )
 
 excluded_profile_audit <- excluded_daly_rate_grid |>
@@ -374,50 +545,62 @@ excluded_profile_audit <- excluded_daly_rate_grid |>
     age_cells_expected = length(age_levels),
     age_cells_observed = sum(!is.na(val)),
     missing_age_cells = sum(is.na(val)),
-    nonzero_age_cells = sum(val_filled_zero != 0),
-    min_DALY_rate_per_100k = min(val_filled_zero),
-    max_DALY_rate_per_100k = max(val_filled_zero),
-    mean_DALY_rate_per_100k = mean(val_filled_zero),
-    sd_DALY_rate_per_100k = stats::sd(val_filled_zero),
-    all_zero_DALY_rate = all(val_filled_zero == 0),
-    zero_standard_deviation = stats::sd(val_filled_zero) == 0,
+    nonzero_age_cells =
+      sum(val_filled_zero != 0),
+    min_DALY_rate_per_100k =
+      min(val_filled_zero),
+    max_DALY_rate_per_100k =
+      max(val_filled_zero),
+    mean_DALY_rate_per_100k =
+      mean(val_filled_zero),
+    sd_DALY_rate_per_100k =
+      stats::sd(val_filled_zero),
+    all_zero_DALY_rate =
+      all(val_filled_zero == 0),
+    zero_standard_deviation =
+      stats::sd(val_filled_zero) == 0,
     .groups = "drop"
   )
 
-# Add all-age and 30–69 DALY numbers for transparent burden auditing.
 excluded_daly_numbers <- analysis_data |>
   dplyr::filter(
     cause %in% unclassified_gbd_causes$cause,
-    measure == "DALYs (Disability-Adjusted Life Years)",
+    measure == daly_measure,
     metric == "Number",
     age %in% c("All ages", age_30_69)
   ) |>
   dplyr::mutate(
     analysis_window = dplyr::if_else(
       age == "All ages",
-      "All ages",
-      "Ages 30–69"
+      "all_ages",
+      "age30_69"
     )
   ) |>
-  dplyr::group_by(cause, analysis_window) |>
-  dplyr::summarise(DALY_number = sum(val, na.rm = TRUE), .groups = "drop") |>
+  dplyr::group_by(
+    cause,
+    analysis_window
+  ) |>
+  dplyr::summarise(
+    DALY_number =
+      sum(val, na.rm = TRUE),
+    .groups = "drop"
+  ) |>
   tidyr::complete(
     cause = unclassified_gbd_causes$cause,
-    analysis_window = c("All ages", "Ages 30–69"),
-    fill = list(DALY_number = 0)
+    analysis_window = c(
+      "all_ages",
+      "age30_69"
+    ),
+    fill = list(
+      DALY_number = 0
+    )
   ) |>
   tidyr::pivot_wider(
     names_from = analysis_window,
     values_from = DALY_number,
     names_prefix = "DALYs_"
-  ) |>
-  dplyr::rename(
-    DALYs_all_ages = `DALYs_All ages`,
-    DALYs_age30_69 = `DALYs_Ages 30–69`
   )
 
-# Also verify that no all-age Number value is non-zero for any of the four
-# burden measures in these excluded causes.
 excluded_all_measure_check <- analysis_data |>
   dplyr::filter(
     cause %in% unclassified_gbd_causes$cause,
@@ -426,28 +609,38 @@ excluded_all_measure_check <- analysis_data |>
   ) |>
   dplyr::group_by(cause) |>
   dplyr::summarise(
-    nonzero_all_age_measure_count = sum(val != 0, na.rm = TRUE),
-    max_abs_all_age_number = max(abs(val), na.rm = TRUE),
+    nonzero_all_age_measure_count =
+      sum(val != 0, na.rm = TRUE),
+    max_abs_all_age_number =
+      max(abs(val), na.rm = TRUE),
     .groups = "drop"
   )
 
 excluded_cause_audit <- excluded_profile_audit |>
-  dplyr::left_join(excluded_daly_numbers, by = "cause") |>
-  dplyr::left_join(excluded_all_measure_check, by = "cause") |>
+  dplyr::left_join(
+    excluded_daly_numbers,
+    by = "cause"
+  ) |>
+  dplyr::left_join(
+    excluded_all_measure_check,
+    by = "cause"
+  ) |>
   dplyr::mutate(
-    exclusion_reason = dplyr::case_when(
-      missing_age_cells > 0 ~ "requires_review_missing_age_cells",
-      all_zero_DALY_rate & zero_standard_deviation ~
-        "all_zero_DALY_rate_across_22_ages",
-      zero_standard_deviation ~
-        "zero_standard_deviation_DALY_rate",
-      TRUE ~ "requires_review_nonzero_variable_profile"
-    )
+    exclusion_reason =
+      dplyr::case_when(
+        missing_age_cells > 0 ~
+          "requires_review_missing_age_cells",
+        all_zero_DALY_rate &
+          zero_standard_deviation ~
+          "all_zero_DALY_rate_across_22_ages",
+        zero_standard_deviation ~
+          "zero_standard_deviation_DALY_rate",
+        TRUE ~
+          "requires_review_nonzero_variable_profile"
+      )
   ) |>
   dplyr::arrange(cause)
 
-# The finalized 304 -> 292 exclusion should be entirely explained by 12
-# complete, all-zero, zero-variance DALY-rate profiles.
 unexpected_excluded <- excluded_cause_audit |>
   dplyr::filter(
     age_cells_observed != length(age_levels) |
@@ -459,6 +652,7 @@ unexpected_excluded <- excluded_cause_audit |>
 
 if (nrow(unexpected_excluded) > 0L) {
   print(unexpected_excluded)
+
   stop(
     "One or more of the 12 unclassified causes do not meet the expected ",
     "all-zero/zero-variance exclusion rule. Review the audit table."
@@ -466,339 +660,583 @@ if (nrow(unexpected_excluded) > 0L) {
 }
 
 readr::write_csv(
+  unclassified_gbd_causes,
+  file.path(
+    output_dir,
+    "Stage2_unclassified_GBD_causes.csv"
+  )
+)
+
+readr::write_csv(
   excluded_cause_audit,
-  file.path(output_dir, "Stage1_excluded_12_causes_audit.csv")
+  file.path(
+    output_dir,
+    "Stage1_excluded_12_causes_audit.csv"
+  )
 )
 
 # ------------------------------------------------------------------------------
-# 6. Figure 2 — all-age mortality and disability by cluster
+# 7. Core DALY quantities for the redesigned Stage 2
 # ------------------------------------------------------------------------------
-# This is the bridge between the all-age clustering and the later 30–69 analysis.
-# GBD age-specific rates are per 100,000. Because the denominator is identical
-# within a given age group, cause-specific rates can be summed within a cluster.
 
-figure2_data <- classified_data |>
+daly_all_age_cluster <- classified_data |>
   dplyr::filter(
-    metric == "Rate",
-    age %in% age_levels,
-    measure %in% c("Deaths", "YLDs (Years Lived with Disability)")
+    measure == daly_measure,
+    metric == "Number",
+    age == "All ages"
   ) |>
-  dplyr::group_by(measure, cluster_name, age) |>
-  dplyr::summarise(rate_per_100k = sum(val, na.rm = TRUE), .groups = "drop") |>
-  tidyr::complete(
-    measure,
-    cluster_name = factor(cluster_order, levels = cluster_order),
-    age = age_levels,
-    fill = list(rate_per_100k = 0)
+  dplyr::group_by(cluster_name) |>
+  dplyr::summarise(
+    DALYs_all_ages =
+      sum(val, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+daly_30_69_cluster <- classified_data |>
+  dplyr::filter(
+    measure == daly_measure,
+    metric == "Number",
+    age %in% age_30_69
+  ) |>
+  dplyr::group_by(cluster_name) |>
+  dplyr::summarise(
+    DALYs_age30_69 =
+      sum(val, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+daly_all_age_classified_total <-
+  sum(daly_all_age_cluster$DALYs_all_ages)
+
+daly_30_69_classified_total <-
+  sum(daly_30_69_cluster$DALYs_age30_69)
+
+all_causes_daly_all_age <- analysis_data |>
+  dplyr::filter(
+    cause == "All causes",
+    measure == daly_measure,
+    metric == "Number",
+    age == "All ages"
+  ) |>
+  dplyr::summarise(
+    value = sum(val, na.rm = TRUE)
+  ) |>
+  dplyr::pull(value)
+
+all_causes_daly_30_69 <- analysis_data |>
+  dplyr::filter(
+    cause == "All causes",
+    measure == daly_measure,
+    metric == "Number",
+    age %in% age_30_69
+  ) |>
+  dplyr::summarise(
+    value = sum(val, na.rm = TRUE)
+  ) |>
+  dplyr::pull(value)
+
+if (
+  length(all_causes_daly_all_age) != 1L ||
+    length(all_causes_daly_30_69) != 1L
+) {
+  stop(
+    "All-causes DALY denominator lookup failed."
+  )
+}
+
+if (
+  !is.finite(all_causes_daly_all_age) ||
+    !is.finite(all_causes_daly_30_69)
+) {
+  stop(
+    "Non-finite All-causes DALY denominator detected."
+  )
+}
+
+core_daly_summary <- cluster_membership |>
+  dplyr::count(
+    cluster_name,
+    name = "n_causes"
+  ) |>
+  dplyr::left_join(
+    daly_all_age_cluster,
+    by = "cluster_name"
+  ) |>
+  dplyr::left_join(
+    daly_30_69_cluster,
+    by = "cluster_name"
   ) |>
   dplyr::mutate(
-    age = factor(age, levels = age_levels, ordered = TRUE),
-    age_index = as.integer(age),
-    age_numeric = age_midpoints[age_index],
-    cluster_name = factor(cluster_name, levels = cluster_order),
-    panel = dplyr::recode(
-      measure,
-      "Deaths" = "Mortality",
-      "YLDs (Years Lived with Disability)" = "Disability (YLD)"
-    ),
-    # Explicit factor order keeps Mortality on the left and Disability on the right.
-    panel = factor(
-      panel,
-      levels = c("Mortality", "Disability (YLD)")
-    ),
-    rate_per_person = rate_per_100k / 100000
+    share_of_classified_DALYs_age30_69 =
+      safe_ratio(
+        DALYs_age30_69,
+        daly_30_69_classified_total
+      ),
+    share_of_all_causes_DALYs_age30_69 =
+      safe_ratio(
+        DALYs_age30_69,
+        all_causes_daly_30_69
+      ),
+    proportion_cluster_all_age_DALYs_occurring_age30_69 =
+      safe_ratio(
+        DALYs_age30_69,
+        DALYs_all_ages
+      ),
+    share_of_classified_DALYs_all_age =
+      safe_ratio(
+        DALYs_all_ages,
+        daly_all_age_classified_total
+      )
+  ) |>
+  dplyr::mutate(
+    cluster_name = factor(
+      cluster_name,
+      levels = cluster_order
+    )
+  ) |>
+  dplyr::arrange(cluster_name)
+
+overall_daly_window_summary <- tibble::tibble(
+  denominator = c(
+    "Classified 292 causes",
+    "GBD All causes"
+  ),
+  DALYs_all_ages = c(
+    daly_all_age_classified_total,
+    all_causes_daly_all_age
+  ),
+  DALYs_age30_69 = c(
+    daly_30_69_classified_total,
+    all_causes_daly_30_69
+  )
+) |>
+  dplyr::mutate(
+    proportion_all_age_DALYs_occurring_age30_69 =
+      safe_ratio(
+        DALYs_age30_69,
+        DALYs_all_ages
+      )
   )
 
 readr::write_csv(
+  core_daly_summary,
+  file.path(
+    output_dir,
+    "Stage2_core_DALY_summary.csv"
+  )
+)
+
+readr::write_csv(
+  overall_daly_window_summary,
+  file.path(
+    output_dir,
+    "Stage2_overall_DALY_30_69_fraction.csv"
+  )
+)
+
+# ------------------------------------------------------------------------------
+# 8. Fatal vs non-fatal health-loss phenotype at ages 30–69
+# ------------------------------------------------------------------------------
+
+yll_yld_30_69 <- classified_data |>
+  dplyr::filter(
+    metric == "Number",
+    age %in% age_30_69,
+    measure %in% c(
+      yll_measure,
+      yld_measure
+    )
+  ) |>
+  dplyr::group_by(
+    cluster_name,
+    measure
+  ) |>
+  dplyr::summarise(
+    estimate = sum(val, na.rm = TRUE),
+    .groups = "drop"
+  ) |>
+  dplyr::mutate(
+    component = dplyr::recode(
+      measure,
+      "YLLs (Years of Life Lost)" = "YLLs",
+      "YLDs (Years Lived with Disability)" = "YLDs"
+    )
+  ) |>
+  dplyr::select(
+    cluster_name,
+    component,
+    estimate
+  ) |>
+  tidyr::pivot_wider(
+    names_from = component,
+    values_from = estimate,
+    values_fill = 0
+  )
+
+phenotype_30_69 <- core_daly_summary |>
+  dplyr::left_join(
+    yll_yld_30_69,
+    by = "cluster_name"
+  ) |>
+  dplyr::mutate(
+    YLL_plus_YLD = YLLs + YLDs,
+    YLL_fraction_of_YLL_plus_YLD =
+      safe_ratio(
+        YLLs,
+        YLL_plus_YLD
+      ),
+    YLD_fraction_of_YLL_plus_YLD =
+      safe_ratio(
+        YLDs,
+        YLL_plus_YLD
+      ),
+    YLL_fraction_of_reported_DALYs =
+      safe_ratio(
+        YLLs,
+        DALYs_age30_69
+      ),
+    YLD_fraction_of_reported_DALYs =
+      safe_ratio(
+        YLDs,
+        DALYs_age30_69
+      ),
+    DALY_identity_relative_error =
+      safe_ratio(
+        abs(
+          DALYs_age30_69 -
+            YLL_plus_YLD
+        ),
+        DALYs_age30_69
+      )
+  )
+
+if (
+  any(
+    !is.finite(
+      phenotype_30_69$YLL_fraction_of_YLL_plus_YLD
+    )
+  ) ||
+    any(
+      !is.finite(
+        phenotype_30_69$YLD_fraction_of_YLL_plus_YLD
+      )
+    )
+) {
+  stop(
+    "Non-finite YLL/YLD component shares detected."
+  )
+}
+
+# ------------------------------------------------------------------------------
+# 9. Table 1 — the core Stage 2 summary
+# ------------------------------------------------------------------------------
+
+table1 <- phenotype_30_69 |>
+  dplyr::select(
+    cluster_name,
+    n_causes,
+    DALYs_all_ages,
+    DALYs_age30_69,
+    share_of_classified_DALYs_age30_69,
+    share_of_all_causes_DALYs_age30_69,
+    proportion_cluster_all_age_DALYs_occurring_age30_69,
+    YLLs,
+    YLDs,
+    YLL_fraction_of_YLL_plus_YLD,
+    YLD_fraction_of_YLL_plus_YLD,
+    DALY_identity_relative_error
+  ) |>
+  dplyr::arrange(cluster_name)
+
+readr::write_csv(
+  table1,
+  file.path(
+    output_dir,
+    "Table1_core_health_loss_summary_2023.csv"
+  )
+)
+
+# ------------------------------------------------------------------------------
+# 10. Figure 2 — two complementary views of 30–69 DALY burden
+# ------------------------------------------------------------------------------
+# Panel A:
+#   Of all classified DALYs occurring at ages 30–69, what share belongs to each
+#   life-course disease cluster?
+#
+# Panel B:
+#   Within each life-course disease cluster, what proportion of its own all-age
+#   DALY burden has already occurred at ages 30–69?
+#
+# These are deliberately different denominators and therefore answer different
+# scientific questions.
+
+figure2_data <- dplyr::bind_rows(
+  core_daly_summary |>
+    dplyr::transmute(
+      cluster_name,
+      panel =
+        "A. Share of DALYs occurring at ages 30–69",
+      value =
+        share_of_classified_DALYs_age30_69,
+      denominator =
+        "All classified DALYs at ages 30–69",
+      DALYs_age30_69,
+      DALYs_all_ages
+    ),
+  core_daly_summary |>
+    dplyr::transmute(
+      cluster_name,
+      panel =
+        "B. Proportion of each cluster's all-age DALYs occurring at ages 30–69",
+      value =
+        proportion_cluster_all_age_DALYs_occurring_age30_69,
+      denominator =
+        "All-age DALYs within the same cluster",
+      DALYs_age30_69,
+      DALYs_all_ages
+    )
+) |>
+  dplyr::mutate(
+    cluster_name = factor(
+      cluster_name,
+      levels = cluster_order
+    ),
+    panel = factor(
+      panel,
+      levels = c(
+        "A. Share of DALYs occurring at ages 30–69",
+        "B. Proportion of each cluster's all-age DALYs occurring at ages 30–69"
+      )
+    )
+  )
+
+if (
+  any(
+    !is.finite(
+      figure2_data$value
+    )
+  )
+) {
+  stop(
+    "Non-finite values detected before Figure 2."
+  )
+}
+
+readr::write_csv(
   figure2_data,
-  file.path(output_dir, "Figure2_source_data.csv")
+  file.path(
+    output_dir,
+    "Figure2_source_data.csv"
+  )
 )
 
 p2 <- ggplot2::ggplot(
   figure2_data,
   ggplot2::aes(
-    x = age_numeric,
-    y = rate_per_person,
-    color = cluster_name,
-    group = cluster_name
+    x = cluster_name,
+    y = value,
+    fill = cluster_name
   )
 ) +
-  ggplot2::geom_line(linewidth = 1.25, lineend = "round") +
-  ggplot2::facet_wrap(~panel, nrow = 1, scales = "free_y") +
-  ggplot2::scale_color_manual(
+  ggplot2::geom_col(
+    width = 0.66
+  ) +
+  ggplot2::geom_text(
+    ggplot2::aes(
+      label = scales::percent(
+        value,
+        accuracy = 0.1
+      )
+    ),
+    vjust = -0.35,
+    fontface = "bold",
+    size = 3.8
+  ) +
+  ggplot2::facet_wrap(
+    ~panel,
+    nrow = 1
+  ) +
+  ggplot2::scale_fill_manual(
     values = cluster_colors,
-    breaks = cluster_order,
+    guide = "none",
     drop = FALSE
   ) +
-  ggplot2::scale_x_continuous(
-    breaks = c(0, 25, 50, 75, 100),
-    limits = c(0, 100),
-    expand = ggplot2::expansion(mult = c(0.01, 0.02))
-  ) +
   ggplot2::scale_y_continuous(
-    labels = scales::label_number(accuracy = 0.001)
-  ) +
-  ggplot2::labs(
-    title = "Mortality and disability burden by disease cluster in China, 2023",
-    subtitle = "Age-specific cluster rates across the full life course",
-    x = "Age (years)",
-    y = "Rate per person",
-    color = "Disease cluster",
-    caption = paste0(
-      "Source: GBD 2023, Both sexes. Cause-specific rates per 100,000 were ",
-      "summed within the fixed Stage 1 clusters and divided by 100,000."
+    labels = scales::percent_format(
+      accuracy = 10
+    ),
+    limits = c(0, 1),
+    expand = ggplot2::expansion(
+      mult = c(0, 0.08)
     )
   ) +
-  ggplot2::theme_bw(base_size = 13) +
+  ggplot2::labs(
+    title =
+      "Health loss at ages 30–69 across life-course disease clusters, China, 2023",
+    subtitle = paste0(
+      "Panel A asks which clusters account for health loss in the 30–69-year window; ",
+      "Panel B asks how much of each cluster's own all-age DALY burden occurs in this window."
+    ),
+    x = NULL,
+    y = "Proportion",
+    caption = paste0(
+      "Source: GBD 2023, Both sexes. The 30–69-year window corresponds to the ",
+      "age range used for premature NCD mortality monitoring, but DALYs represent ",
+      "broader fatal and non-fatal health loss and are not the SDG 3.4.1 mortality probability."
+    )
+  ) +
+  ggplot2::theme_bw(
+    base_size = 12.5
+  ) +
   ggplot2::theme(
-    legend.position = "bottom",
-    panel.grid.minor = ggplot2::element_blank(),
-    panel.grid.major = ggplot2::element_line(color = "grey92", linewidth = 0.4),
-    strip.background = ggplot2::element_rect(fill = "grey94", color = "grey75"),
-    strip.text = ggplot2::element_text(face = "bold"),
-    plot.title = ggplot2::element_text(face = "bold", size = 16),
-    plot.subtitle = ggplot2::element_text(color = "grey35"),
-    plot.caption = ggplot2::element_text(size = 8, color = "grey40", hjust = 0)
+    panel.grid.minor =
+      ggplot2::element_blank(),
+    panel.grid.major.x =
+      ggplot2::element_blank(),
+    strip.background =
+      ggplot2::element_rect(
+        fill = "grey94",
+        color = "grey75"
+      ),
+    strip.text =
+      ggplot2::element_text(
+        face = "bold",
+        size = 11
+      ),
+    axis.text.x =
+      ggplot2::element_text(
+        angle = 20,
+        hjust = 1
+      ),
+    plot.title =
+      ggplot2::element_text(
+        face = "bold",
+        size = 15
+      ),
+    plot.subtitle =
+      ggplot2::element_text(
+        color = "grey35"
+      ),
+    plot.caption =
+      ggplot2::element_text(
+        size = 8,
+        color = "grey40",
+        hjust = 0
+      )
   )
 
 save_plot_pair(
   p2,
-  "Figure2_age_specific_mortality_YLD",
-  width = 11,
-  height = 6.4
-)
-
-# ------------------------------------------------------------------------------
-# 7. Figure 3 — all ages vs ages 30–69 burden composition
-# ------------------------------------------------------------------------------
-# This figure explicitly shows how the burden composition changes when moving
-# from the national all-age burden to the study's public-health window (30–69).
-
-all_age_numbers <- classified_data |>
-  dplyr::filter(metric == "Number", age == "All ages") |>
-  dplyr::group_by(measure, measure_short, cluster_name) |>
-  dplyr::summarise(estimate = sum(val, na.rm = TRUE), .groups = "drop") |>
-  dplyr::mutate(analysis_window = "All ages")
-
-age30_69_numbers <- classified_data |>
-  dplyr::filter(metric == "Number", age %in% age_30_69) |>
-  dplyr::group_by(measure, measure_short, cluster_name) |>
-  dplyr::summarise(estimate = sum(val, na.rm = TRUE), .groups = "drop") |>
-  dplyr::mutate(analysis_window = "Ages 30–69")
-
-burden_comparison <- dplyr::bind_rows(all_age_numbers, age30_69_numbers) |>
-  dplyr::group_by(analysis_window, measure, measure_short) |>
-  dplyr::mutate(
-    classified_total = sum(estimate),
-    share_of_classified = safe_ratio(estimate, classified_total)
-  ) |>
-  dplyr::ungroup() |>
-  dplyr::mutate(
-    analysis_window = factor(
-      analysis_window,
-      levels = c("All ages", "Ages 30–69")
-    ),
-    measure_short = factor(
-      measure_short,
-      levels = c("Deaths", "YLLs", "YLDs", "DALYs")
-    ),
-    cluster_name = factor(cluster_name, levels = cluster_order)
-  ) |>
-  dplyr::arrange(analysis_window, measure_short, cluster_name)
-
-# Closure against GBD All causes for each analysis window.
-all_causes_all_age <- analysis_data |>
-  dplyr::filter(metric == "Number", age == "All ages", cause == "All causes") |>
-  dplyr::transmute(
-    analysis_window = "All ages",
-    measure,
-    measure_short,
-    all_causes_value = val
-  )
-
-all_causes_30_69 <- analysis_data |>
-  dplyr::filter(metric == "Number", age %in% age_30_69, cause == "All causes") |>
-  dplyr::group_by(measure, measure_short) |>
-  dplyr::summarise(all_causes_value = sum(val, na.rm = TRUE), .groups = "drop") |>
-  dplyr::mutate(analysis_window = "Ages 30–69")
-
-all_causes_windows <- dplyr::bind_rows(all_causes_all_age, all_causes_30_69)
-
-closure_windows <- burden_comparison |>
-  dplyr::group_by(analysis_window, measure, measure_short) |>
-  dplyr::summarise(classified_total = sum(estimate), .groups = "drop") |>
-  dplyr::mutate(analysis_window = as.character(analysis_window)) |>
-  dplyr::left_join(
-    all_causes_windows,
-    by = c("analysis_window", "measure", "measure_short")
-  ) |>
-  dplyr::mutate(
-    classified_to_all_ratio = safe_ratio(classified_total, all_causes_value)
-  )
-
-burden_comparison <- burden_comparison |>
-  dplyr::mutate(analysis_window_chr = as.character(analysis_window)) |>
-  dplyr::left_join(
-    closure_windows |>
-      dplyr::select(
-        analysis_window,
-        measure,
-        all_causes_value,
-        classified_to_all_ratio
-      ),
-    by = c(
-      "analysis_window_chr" = "analysis_window",
-      "measure" = "measure"
-    )
-  ) |>
-  dplyr::mutate(
-    share_of_all_causes = safe_ratio(estimate, all_causes_value)
-  ) |>
-  dplyr::select(-analysis_window_chr)
-
-readr::write_csv(
-  burden_comparison,
-  file.path(output_dir, "Figure3_all_age_vs_30_69_burden_composition.csv")
-)
-readr::write_csv(
-  closure_windows,
-  file.path(output_dir, "Stage2_all_age_vs_30_69_closure.csv")
-)
-
-if (any(!is.finite(burden_comparison$share_of_classified))) {
-  stop("Non-finite burden shares detected before Figure 3.")
-}
-
-p3 <- ggplot2::ggplot(
-  burden_comparison,
-  ggplot2::aes(
-    x = measure_short,
-    y = share_of_classified,
-    fill = cluster_name
-  )
-) +
-  ggplot2::geom_col(width = 0.72, color = "white", linewidth = 0.25) +
-  ggplot2::geom_text(
-    ggplot2::aes(
-      label = dplyr::if_else(
-        share_of_classified >= 0.04,
-        scales::percent(share_of_classified, accuracy = 0.1),
-        ""
-      )
-    ),
-    position = ggplot2::position_stack(vjust = 0.5),
-    color = "white",
-    fontface = "bold",
-    size = 3.1
-  ) +
-  ggplot2::facet_wrap(~analysis_window, nrow = 1) +
-  ggplot2::scale_fill_manual(
-    values = cluster_colors,
-    breaks = cluster_order,
-    drop = FALSE
-  ) +
-  ggplot2::scale_y_continuous(
-    labels = scales::percent_format(accuracy = 1),
-    expand = ggplot2::expansion(mult = c(0, 0.02))
-  ) +
-  ggplot2::coord_cartesian(ylim = c(0, 1)) +
-  ggplot2::labs(
-    title = "Disease burden composition by age-profile cluster, China, 2023",
-    subtitle = "Comparison of the national all-age burden with the 30–69-year public-health window",
-    x = NULL,
-    y = "Share of classified burden",
-    fill = "Disease cluster",
-    caption = paste0(
-      "Source: GBD 2023, Both sexes. Shares are calculated within the 292 causes ",
-      "classified by the fixed Stage 1 solution."
-    )
-  ) +
-  ggplot2::theme_bw(base_size = 13) +
-  ggplot2::theme(
-    legend.position = "bottom",
-    panel.grid.minor = ggplot2::element_blank(),
-    panel.grid.major.x = ggplot2::element_blank(),
-    strip.background = ggplot2::element_rect(fill = "grey94", color = "grey75"),
-    strip.text = ggplot2::element_text(face = "bold", size = 12),
-    plot.title = ggplot2::element_text(face = "bold", size = 16),
-    plot.subtitle = ggplot2::element_text(color = "grey35"),
-    plot.caption = ggplot2::element_text(size = 8, color = "grey40", hjust = 0)
-  )
-
-save_plot_pair(
-  p3,
-  "Figure3_all_age_vs_30_69_burden_composition",
-  width = 11,
+  "Figure2_health_loss_age30_69_two_perspectives",
+  width = 12,
   height = 6.5
 )
 
 # ------------------------------------------------------------------------------
-# 8. Figure 4 — age gradient in cluster contribution within ages 30–69
+# 11. Figure 3 — age gradient in DALY composition at ages 30–69
 # ------------------------------------------------------------------------------
-# Main-text panels use Deaths and DALYs to emphasize premature mortality and
-# total health loss. All four measures are exported as source data and rates.
 
-age_cluster_rates <- classified_data |>
-  dplyr::filter(metric == "Rate", age %in% age_30_69) |>
-  dplyr::group_by(measure, measure_short, cluster_name, age) |>
-  dplyr::summarise(rate_per_100k = sum(val, na.rm = TRUE), .groups = "drop") |>
+age_cluster_daly_rates <- classified_data |>
+  dplyr::filter(
+    measure == daly_measure,
+    metric == "Rate",
+    age %in% age_30_69
+  ) |>
+  dplyr::group_by(
+    cluster_name,
+    age
+  ) |>
+  dplyr::summarise(
+    rate_per_100k =
+      sum(val, na.rm = TRUE),
+    .groups = "drop"
+  ) |>
   tidyr::complete(
-    measure,
-    cluster_name = factor(cluster_order, levels = cluster_order),
+    cluster_name =
+      factor(
+        cluster_order,
+        levels = cluster_order
+      ),
     age = age_30_69,
-    fill = list(rate_per_100k = 0)
+    fill = list(
+      rate_per_100k = 0
+    )
   ) |>
   dplyr::mutate(
-    measure_short = unname(measure_short_lookup[measure]),
-    age = factor(age, levels = age_30_69, ordered = TRUE),
-    age_index = as.integer(age),
-    age_midpoint = age_midpoints_30_69[age_index],
-    cluster_name = factor(cluster_name, levels = cluster_order),
-    measure_short = factor(
-      measure_short,
-      levels = c("Deaths", "YLLs", "YLDs", "DALYs")
-    )
+    cluster_name =
+      factor(
+        cluster_name,
+        levels = cluster_order
+      ),
+    age =
+      factor(
+        age,
+        levels = age_30_69,
+        ordered = TRUE
+      ),
+    age_index =
+      as.integer(age),
+    age_midpoint =
+      age_midpoints_30_69[age_index]
   )
 
-age_cluster_shares <- age_cluster_rates |>
-  dplyr::group_by(measure, measure_short, age, age_index, age_midpoint) |>
+figure3_data <- age_cluster_daly_rates |>
+  dplyr::group_by(
+    age,
+    age_index,
+    age_midpoint
+  ) |>
   dplyr::mutate(
-    classified_rate_per_100k = sum(rate_per_100k),
-    share_of_classified = safe_ratio(rate_per_100k, classified_rate_per_100k)
+    classified_DALY_rate_per_100k =
+      sum(rate_per_100k),
+    share_of_classified_DALY_rate =
+      safe_ratio(
+        rate_per_100k,
+        classified_DALY_rate_per_100k
+      )
   ) |>
   dplyr::ungroup() |>
-  dplyr::arrange(measure_short, age_index, cluster_name)
-
-readr::write_csv(
-  age_cluster_rates,
-  file.path(output_dir, "Figure4_age30_69_cluster_rates.csv")
-)
-readr::write_csv(
-  age_cluster_shares,
-  file.path(output_dir, "Figure4_age30_69_cluster_shares.csv")
-)
-
-figure4_data <- age_cluster_shares |>
-  dplyr::filter(measure_short %in% c("Deaths", "DALYs")) |>
-  dplyr::mutate(
-    panel = factor(
-      as.character(measure_short),
-      levels = c("Deaths", "DALYs")
-    )
+  dplyr::arrange(
+    age_index,
+    cluster_name
   )
 
-p4 <- ggplot2::ggplot(
-  figure4_data,
+if (
+  any(
+    !is.finite(
+      figure3_data$share_of_classified_DALY_rate
+    )
+  )
+) {
+  stop(
+    "Non-finite DALY shares detected before Figure 3."
+  )
+}
+
+readr::write_csv(
+  figure3_data,
+  file.path(
+    output_dir,
+    "Figure3_age30_69_DALY_gradient_source_data.csv"
+  )
+)
+
+p3 <- ggplot2::ggplot(
+  figure3_data,
   ggplot2::aes(
     x = age_midpoint,
-    y = share_of_classified,
+    y = share_of_classified_DALY_rate,
     color = cluster_name,
     group = cluster_name
   )
 ) +
-  ggplot2::geom_line(linewidth = 1.15, lineend = "round") +
-  ggplot2::geom_point(size = 2.2) +
-  ggplot2::facet_wrap(~panel, nrow = 1) +
+  ggplot2::geom_line(
+    linewidth = 1.15,
+    lineend = "round"
+  ) +
+  ggplot2::geom_point(
+    size = 2.25
+  ) +
   ggplot2::scale_color_manual(
     values = cluster_colors,
     breaks = cluster_order,
@@ -807,405 +1245,546 @@ p4 <- ggplot2::ggplot(
   ggplot2::scale_x_continuous(
     breaks = age_midpoints_30_69,
     labels = age_30_69,
-    expand = ggplot2::expansion(mult = c(0.02, 0.02))
+    expand = ggplot2::expansion(
+      mult = c(0.02, 0.02)
+    )
   ) +
   ggplot2::scale_y_continuous(
-    labels = scales::percent_format(accuracy = 1),
+    labels = scales::percent_format(
+      accuracy = 10
+    ),
     limits = c(0, 1),
-    expand = ggplot2::expansion(mult = c(0, 0.02))
+    expand = ggplot2::expansion(
+      mult = c(0, 0.02)
+    )
   ) +
   ggplot2::labs(
-    title = "Age gradient in disease-cluster contribution, China, 2023",
-    subtitle = "Cluster share of classified burden within each five-year age group from 30 to 69 years",
+    title =
+      "Age gradient in DALY composition across the 30–69-year window, China, 2023",
+    subtitle = paste0(
+      "Share of the classified age-specific DALY rate contributed by each ",
+      "life-course disease cluster"
+    ),
     x = "Age group",
-    y = "Share within age group",
+    y = "Share of classified DALY rate",
     color = "Disease cluster",
     caption = paste0(
-      "Source: GBD 2023, Both sexes. Cluster assignment is fixed from the ",
-      "all-age 2023 DALY age-profile classification."
+      "Source: GBD 2023, Both sexes. Cluster membership was fixed from the ",
+      "independent full-life-course 2023 DALY trajectory classification."
     )
   ) +
-  ggplot2::theme_bw(base_size = 12.5) +
+  ggplot2::theme_bw(
+    base_size = 12.5
+  ) +
   ggplot2::theme(
     legend.position = "bottom",
-    panel.grid.minor = ggplot2::element_blank(),
-    panel.grid.major = ggplot2::element_line(color = "grey92", linewidth = 0.4),
-    strip.background = ggplot2::element_rect(fill = "grey94", color = "grey75"),
-    strip.text = ggplot2::element_text(face = "bold"),
-    axis.text.x = ggplot2::element_text(angle = 45, hjust = 1),
-    plot.title = ggplot2::element_text(face = "bold", size = 16),
-    plot.subtitle = ggplot2::element_text(color = "grey35"),
-    plot.caption = ggplot2::element_text(size = 8, color = "grey40", hjust = 0)
+    panel.grid.minor =
+      ggplot2::element_blank(),
+    panel.grid.major =
+      ggplot2::element_line(
+        color = "grey92",
+        linewidth = 0.4
+      ),
+    axis.text.x =
+      ggplot2::element_text(
+        angle = 45,
+        hjust = 1
+      ),
+    plot.title =
+      ggplot2::element_text(
+        face = "bold",
+        size = 15
+      ),
+    plot.subtitle =
+      ggplot2::element_text(
+        color = "grey35"
+      ),
+    plot.caption =
+      ggplot2::element_text(
+        size = 8,
+        color = "grey40",
+        hjust = 0
+      )
   )
 
 save_plot_pair(
-  p4,
-  "Figure4_age30_69_cluster_share_gradient",
-  width = 11,
-  height = 6.2
+  p3,
+  "Figure3_age30_69_DALY_cluster_gradient",
+  width = 10.5,
+  height = 6.6
 )
 
 # ------------------------------------------------------------------------------
-# 9. 30–69 cause-level burden and Figure 5
+# 12. Supplementary Figure S1 — fatal vs non-fatal DALY composition
 # ------------------------------------------------------------------------------
 
-cause_burden_30_69 <- classified_data |>
-  dplyr::filter(metric == "Number", age %in% age_30_69) |>
-  dplyr::group_by(measure, measure_short, cluster_name, cause) |>
-  dplyr::summarise(estimate = sum(val, na.rm = TRUE), .groups = "drop") |>
-  dplyr::group_by(measure, measure_short, cluster_name) |>
-  dplyr::mutate(
-    cluster_total = sum(estimate),
-    share_within_cluster = safe_ratio(estimate, cluster_total)
-  ) |>
-  dplyr::ungroup() |>
-  dplyr::group_by(measure, measure_short) |>
-  dplyr::mutate(
-    classified_total_30_69 = sum(estimate),
-    share_of_classified_30_69 = safe_ratio(estimate, classified_total_30_69)
-  ) |>
-  dplyr::ungroup() |>
-  dplyr::mutate(
-    measure_short = factor(
-      measure_short,
-      levels = c("Deaths", "YLLs", "YLDs", "DALYs")
-    ),
-    cluster_name = factor(cluster_name, levels = cluster_order)
-  ) |>
-  dplyr::arrange(measure_short, cluster_name, dplyr::desc(estimate))
-
-readr::write_csv(
-  cause_burden_30_69,
-  file.path(output_dir, "Stage2_age30_69_cause_burden_all_measures.csv")
-)
-
-top10_30_69 <- cause_burden_30_69 |>
-  dplyr::group_by(measure_short, cluster_name) |>
-  dplyr::slice_max(estimate, n = 10, with_ties = FALSE) |>
-  dplyr::arrange(measure_short, cluster_name, dplyr::desc(estimate)) |>
-  dplyr::mutate(rank_within_cluster = dplyr::row_number()) |>
-  dplyr::ungroup()
-
-readr::write_csv(
-  top10_30_69,
-  file.path(output_dir, "Stage2_age30_69_top10_causes_by_cluster_measure.csv")
-)
-
-top10_daly_30_69 <- top10_30_69 |>
-  dplyr::filter(measure_short == "DALYs") |>
-  dplyr::mutate(
-    cause_panel = paste(cause, cluster_name, sep = "___"),
-    cause_panel = forcats::fct_reorder(cause_panel, estimate)
-  )
-
-readr::write_csv(
-  top10_daly_30_69 |>
-    dplyr::select(-cause_panel),
-  file.path(output_dir, "Figure5_age30_69_top10_DALY_causes.csv")
-)
-
-if (any(!is.finite(top10_daly_30_69$estimate))) {
-  stop("Non-finite DALY estimates detected before Figure 5.")
-}
-
-p5 <- ggplot2::ggplot(
-  top10_daly_30_69,
-  ggplot2::aes(x = estimate, y = cause_panel, fill = cluster_name)
-) +
-  ggplot2::geom_col(width = 0.72) +
-  ggplot2::facet_wrap(~cluster_name, scales = "free_y", ncol = 1) +
-  ggplot2::scale_fill_manual(values = cluster_colors, guide = "none") +
-  ggplot2::scale_y_discrete(labels = function(x) sub("___.*$", "", x)) +
-  ggplot2::scale_x_continuous(
-    labels = scales::label_number(scale = 1e-6, suffix = " M", accuracy = 0.1)
-  ) +
-  ggplot2::labs(
-    title = "Leading causes of DALYs within each disease cluster, ages 30–69, China, 2023",
-    subtitle = "Top ten detailed causes by DALY numbers within the 30–69-year analysis window",
-    x = "DALYs (millions)",
-    y = NULL,
-    caption = "Source: GBD 2023, Both sexes. Cluster membership is fixed from Stage 1."
-  ) +
-  ggplot2::theme_bw(base_size = 11) +
-  ggplot2::theme(
-    panel.grid.minor = ggplot2::element_blank(),
-    panel.grid.major.y = ggplot2::element_blank(),
-    strip.background = ggplot2::element_rect(fill = "grey94", color = "grey75"),
-    strip.text = ggplot2::element_text(face = "bold"),
-    plot.title = ggplot2::element_text(face = "bold", size = 14),
-    plot.subtitle = ggplot2::element_text(color = "grey35"),
-    plot.caption = ggplot2::element_text(size = 8, color = "grey40", hjust = 0)
-  )
-
-save_plot_pair(
-  p5,
-  "Figure5_age30_69_top_DALY_causes_by_cluster",
-  width = 12.3,
-  height = 12
-)
-
-# ------------------------------------------------------------------------------
-# 10. Table 1 — 30–69 burden profile by cluster
-# ------------------------------------------------------------------------------
-
-cluster_burden_30_69 <- age30_69_numbers |>
-  dplyr::group_by(measure, measure_short) |>
-  dplyr::mutate(
-    classified_total = sum(estimate),
-    share_of_classified = safe_ratio(estimate, classified_total)
-  ) |>
-  dplyr::ungroup() |>
-  dplyr::mutate(
-    measure_short = factor(
-      measure_short,
-      levels = c("Deaths", "YLLs", "YLDs", "DALYs")
-    ),
-    cluster_name = factor(cluster_name, levels = cluster_order)
-  ) |>
-  dplyr::arrange(measure_short, cluster_name)
-
-# Add GBD All-causes denominator and share of total 30–69 national burden.
-cluster_burden_30_69 <- cluster_burden_30_69 |>
-  dplyr::left_join(
-    all_causes_30_69 |>
-      dplyr::select(measure, all_causes_value),
-    by = "measure"
-  ) |>
-  dplyr::mutate(
-    share_of_all_causes = safe_ratio(estimate, all_causes_value)
-  )
-
-# YLL/YLD phenotype of DALYs by cluster.
-phenotype_30_69 <- cluster_burden_30_69 |>
-  dplyr::select(cluster_name, measure_short, estimate) |>
-  tidyr::pivot_wider(names_from = measure_short, values_from = estimate) |>
-  dplyr::mutate(
-    YLL_fraction_of_DALYs = safe_ratio(YLLs, DALYs),
-    YLD_fraction_of_DALYs = safe_ratio(YLDs, DALYs),
-    YLL_to_YLD_ratio = safe_ratio(YLLs, YLDs),
-    DALY_identity_relative_error = safe_ratio(
-      abs(DALYs - (YLLs + YLDs)),
-      DALYs
-    )
-  )
-
-readr::write_csv(
-  cluster_burden_30_69,
-  file.path(output_dir, "Table1_age30_69_cluster_burden_summary.csv")
-)
-readr::write_csv(
-  phenotype_30_69,
-  file.path(output_dir, "Table1_age30_69_YLL_YLD_DALY_profile.csv")
-)
-
-# ------------------------------------------------------------------------------
-# 11. Supplementary Figure S1 — all-age top DALY causes
-# ------------------------------------------------------------------------------
-# The former all-age Figure 4 is retained as supplementary context rather than
-# competing with the 30–69 main-text analysis.
-
-cause_burden_all_age <- classified_data |>
-  dplyr::filter(
-    metric == "Number",
-    age == "All ages",
-    measure == "DALYs (Disability-Adjusted Life Years)"
-  ) |>
-  dplyr::group_by(cluster_name, cause) |>
-  dplyr::summarise(estimate = sum(val, na.rm = TRUE), .groups = "drop")
-
-top10_daly_all_age <- cause_burden_all_age |>
-  dplyr::group_by(cluster_name) |>
-  dplyr::slice_max(estimate, n = 10, with_ties = FALSE) |>
-  dplyr::ungroup() |>
-  dplyr::mutate(
-    cause_panel = paste(cause, cluster_name, sep = "___"),
-    cause_panel = forcats::fct_reorder(cause_panel, estimate)
-  )
-
-readr::write_csv(
-  top10_daly_all_age |>
-    dplyr::select(-cause_panel),
-  file.path(output_dir, "FigureS1_all_age_top10_DALY_causes.csv")
-)
-
-if (any(!is.finite(top10_daly_all_age$estimate))) {
-  stop("Non-finite all-age DALY estimates detected before Supplementary Figure S1.")
-}
-
-p_s1 <- ggplot2::ggplot(
-  top10_daly_all_age,
-  ggplot2::aes(x = estimate, y = cause_panel, fill = cluster_name)
-) +
-  ggplot2::geom_col(width = 0.72) +
-  ggplot2::facet_wrap(~cluster_name, scales = "free_y", ncol = 1) +
-  ggplot2::scale_fill_manual(values = cluster_colors, guide = "none") +
-  ggplot2::scale_y_discrete(labels = function(x) sub("___.*$", "", x)) +
-  ggplot2::scale_x_continuous(
-    labels = scales::label_number(scale = 1e-6, suffix = " M", accuracy = 0.1)
-  ) +
-  ggplot2::labs(
-    title = "Leading all-age causes of DALYs within each disease cluster, China, 2023",
-    subtitle = "Supplementary all-age context for the fixed disease clusters",
-    x = "DALYs (millions)",
-    y = NULL,
-    caption = "Source: GBD 2023, Both sexes."
-  ) +
-  ggplot2::theme_bw(base_size = 11) +
-  ggplot2::theme(
-    panel.grid.minor = ggplot2::element_blank(),
-    panel.grid.major.y = ggplot2::element_blank(),
-    strip.background = ggplot2::element_rect(fill = "grey94", color = "grey75"),
-    strip.text = ggplot2::element_text(face = "bold"),
-    plot.title = ggplot2::element_text(face = "bold", size = 14),
-    plot.subtitle = ggplot2::element_text(color = "grey35"),
-    plot.caption = ggplot2::element_text(size = 8, color = "grey40", hjust = 0)
-  )
-
-save_plot_pair(
-  p_s1,
-  "FigureS1_all_age_top_DALY_causes_by_cluster",
-  width = 12.3,
-  height = 12
-)
-
-# ------------------------------------------------------------------------------
-# 12. Supplementary Figure S2 — all four 30–69 age-specific cluster rates
-# ------------------------------------------------------------------------------
-
-p_s2 <- ggplot2::ggplot(
-  age_cluster_rates,
-  ggplot2::aes(
-    x = age_midpoint,
-    y = rate_per_100k,
-    color = cluster_name,
-    group = cluster_name
-  )
-) +
-  ggplot2::geom_line(linewidth = 1.05, lineend = "round") +
-  ggplot2::geom_point(size = 1.8) +
-  ggplot2::facet_wrap(~measure_short, scales = "free_y", ncol = 2) +
-  ggplot2::scale_color_manual(
-    values = cluster_colors,
-    breaks = cluster_order,
-    drop = FALSE
-  ) +
-  ggplot2::scale_x_continuous(
-    breaks = age_midpoints_30_69,
-    labels = age_30_69,
-    expand = ggplot2::expansion(mult = c(0.02, 0.02))
-  ) +
-  ggplot2::scale_y_continuous(
-    labels = scales::label_number(big.mark = ",")
-  ) +
-  ggplot2::labs(
-    title = "Age-specific burden rates by disease cluster, ages 30–69, China, 2023",
-    subtitle = "Panels use separate y-axis scales",
-    x = "Age group",
-    y = "Rate per 100,000",
-    color = "Disease cluster",
-    caption = "Source: GBD 2023, Both sexes. Cause-specific rates are summed within each fixed cluster."
-  ) +
-  ggplot2::theme_bw(base_size = 11.5) +
-  ggplot2::theme(
-    legend.position = "bottom",
-    panel.grid.minor = ggplot2::element_blank(),
-    panel.grid.major = ggplot2::element_line(color = "grey92", linewidth = 0.4),
-    strip.background = ggplot2::element_rect(fill = "grey94", color = "grey75"),
-    strip.text = ggplot2::element_text(face = "bold"),
-    axis.text.x = ggplot2::element_text(angle = 45, hjust = 1),
-    plot.title = ggplot2::element_text(face = "bold", size = 15),
-    plot.subtitle = ggplot2::element_text(color = "grey35"),
-    plot.caption = ggplot2::element_text(size = 8, color = "grey40", hjust = 0)
-  )
-
-save_plot_pair(
-  p_s2,
-  "FigureS2_age30_69_age_specific_cluster_rates",
-  width = 11,
-  height = 8
-)
-
-# ------------------------------------------------------------------------------
-# 13. Supplementary Figure S3 — fatal vs non-fatal composition of DALYs
-# ------------------------------------------------------------------------------
-
-phenotype_long <- phenotype_30_69 |>
-  dplyr::mutate(
-    component_total = YLLs + YLDs,
-    YLL_share_of_components = safe_ratio(YLLs, component_total),
-    YLD_share_of_components = safe_ratio(YLDs, component_total)
-  ) |>
+figure_s1_data <- phenotype_30_69 |>
   dplyr::select(
     cluster_name,
-    YLL_share_of_components,
-    YLD_share_of_components
+    YLL_fraction_of_YLL_plus_YLD,
+    YLD_fraction_of_YLL_plus_YLD
   ) |>
   tidyr::pivot_longer(
-    cols = c(YLL_share_of_components, YLD_share_of_components),
+    cols = c(
+      YLL_fraction_of_YLL_plus_YLD,
+      YLD_fraction_of_YLL_plus_YLD
+    ),
     names_to = "component",
     values_to = "share"
   ) |>
   dplyr::mutate(
     component = dplyr::recode(
       component,
-      "YLL_share_of_components" = "YLL (fatal burden)",
-      "YLD_share_of_components" = "YLD (non-fatal burden)"
+      "YLL_fraction_of_YLL_plus_YLD" =
+        "YLL (fatal burden)",
+      "YLD_fraction_of_YLL_plus_YLD" =
+        "YLD (non-fatal burden)"
     ),
     component = factor(
       component,
-      levels = c("YLL (fatal burden)", "YLD (non-fatal burden)")
+      levels = c(
+        "YLL (fatal burden)",
+        "YLD (non-fatal burden)"
+      )
+    ),
+    cluster_name = factor(
+      cluster_name,
+      levels = cluster_order
     )
   )
 
-if (any(!is.finite(phenotype_long$share))) {
-  stop("Non-finite YLL/YLD component shares detected in Supplementary Figure S3.")
-}
+readr::write_csv(
+  figure_s1_data,
+  file.path(
+    output_dir,
+    "FigureS1_YLL_YLD_composition_source_data.csv"
+  )
+)
 
-p_s3 <- ggplot2::ggplot(
-  phenotype_long,
-  ggplot2::aes(x = cluster_name, y = share, fill = component)
+p_s1 <- ggplot2::ggplot(
+  figure_s1_data,
+  ggplot2::aes(
+    x = cluster_name,
+    y = share,
+    fill = component
+  )
 ) +
-  ggplot2::geom_col(width = 0.68, color = "white", linewidth = 0.3) +
+  ggplot2::geom_col(
+    width = 0.68,
+    color = "white",
+    linewidth = 0.3
+  ) +
   ggplot2::geom_text(
-    ggplot2::aes(label = scales::percent(share, accuracy = 0.1)),
-    position = ggplot2::position_stack(vjust = 0.5),
+    ggplot2::aes(
+      label = scales::percent(
+        share,
+        accuracy = 0.1
+      )
+    ),
+    position =
+      ggplot2::position_stack(
+        vjust = 0.5
+      ),
     color = "white",
     fontface = "bold",
-    size = 3.4
+    size = 3.5
   ) +
   ggplot2::scale_y_continuous(
-    labels = scales::percent_format(accuracy = 1),
-    expand = ggplot2::expansion(mult = c(0, 0.02))
-  ) +
-  ggplot2::coord_cartesian(ylim = c(0, 1)) +
-  ggplot2::labs(
-    title = "Fatal and non-fatal composition of DALYs by disease cluster, ages 30–69",
-    x = NULL,
-    y = "Share of DALYs",
-    fill = NULL,
-    caption = paste0(
-      "Stacked shares are normalized to YLL + YLD so that each cluster sums exactly to 100%; ",
-      "Table 1 retains the original YLL/DALY and YLD/DALY ratios."
+    labels = scales::percent_format(
+      accuracy = 10
+    ),
+    expand = ggplot2::expansion(
+      mult = c(0, 0.02)
     )
   ) +
-  ggplot2::theme_bw(base_size = 12) +
+  ggplot2::coord_cartesian(
+    ylim = c(0, 1)
+  ) +
+  ggplot2::labs(
+    title =
+      "Fatal and non-fatal composition of health loss at ages 30–69, China, 2023",
+    x = NULL,
+    y = "Share of YLL + YLD",
+    fill = NULL,
+    caption = paste0(
+      "YLL and YLD shares are normalized to YLL + YLD within each cluster. ",
+      "The main Table 1 retains the reported DALY totals and the DALY identity check."
+    )
+  ) +
+  ggplot2::theme_bw(
+    base_size = 12
+  ) +
   ggplot2::theme(
     legend.position = "bottom",
-    panel.grid.minor = ggplot2::element_blank(),
-    panel.grid.major.x = ggplot2::element_blank(),
-    plot.title = ggplot2::element_text(face = "bold", size = 15),
-    plot.caption = ggplot2::element_text(size = 8, color = "grey40", hjust = 0)
+    panel.grid.minor =
+      ggplot2::element_blank(),
+    panel.grid.major.x =
+      ggplot2::element_blank(),
+    plot.title =
+      ggplot2::element_text(
+        face = "bold",
+        size = 14
+      ),
+    plot.caption =
+      ggplot2::element_text(
+        size = 8,
+        color = "grey40",
+        hjust = 0
+      )
   )
 
 save_plot_pair(
-  p_s3,
-  "FigureS3_age30_69_YLL_YLD_DALY_profile",
-  width = 8.2,
-  height = 5.8
+  p_s1,
+  "FigureS1_age30_69_YLL_YLD_composition",
+  width = 8.4,
+  height = 5.9
 )
 
 # ------------------------------------------------------------------------------
-# 14. Audit, RDS bundle and session information
+# 13. Supplementary Figure S2 — leading 30–69 DALY causes by cluster
+# ------------------------------------------------------------------------------
+
+cause_daly_30_69 <- classified_data |>
+  dplyr::filter(
+    measure == daly_measure,
+    metric == "Number",
+    age %in% age_30_69
+  ) |>
+  dplyr::group_by(
+    cluster_name,
+    cause
+  ) |>
+  dplyr::summarise(
+    DALYs_age30_69 =
+      sum(val, na.rm = TRUE),
+    .groups = "drop"
+  ) |>
+  dplyr::group_by(
+    cluster_name
+  ) |>
+  dplyr::mutate(
+    cluster_DALYs_age30_69 =
+      sum(DALYs_age30_69),
+    share_within_cluster =
+      safe_ratio(
+        DALYs_age30_69,
+        cluster_DALYs_age30_69
+      )
+  ) |>
+  dplyr::ungroup() |>
+  dplyr::mutate(
+    cluster_name = factor(
+      cluster_name,
+      levels = cluster_order
+    )
+  )
+
+top10_daly_30_69 <- cause_daly_30_69 |>
+  dplyr::group_by(
+    cluster_name
+  ) |>
+  dplyr::slice_max(
+    DALYs_age30_69,
+    n = 10,
+    with_ties = FALSE
+  ) |>
+  dplyr::arrange(
+    cluster_name,
+    dplyr::desc(DALYs_age30_69)
+  ) |>
+  dplyr::mutate(
+    rank_within_cluster =
+      dplyr::row_number()
+  ) |>
+  dplyr::ungroup() |>
+  dplyr::mutate(
+    cause_panel =
+      paste(
+        cause,
+        cluster_name,
+        sep = "___"
+      ),
+    cause_panel =
+      forcats::fct_reorder(
+        cause_panel,
+        DALYs_age30_69
+      )
+  )
+
+readr::write_csv(
+  cause_daly_30_69,
+  file.path(
+    output_dir,
+    "TableS2_age30_69_DALY_cause_burden.csv"
+  )
+)
+
+readr::write_csv(
+  top10_daly_30_69 |>
+    dplyr::select(
+      -cause_panel
+    ),
+  file.path(
+    output_dir,
+    "FigureS2_top10_DALY_causes_source_data.csv"
+  )
+)
+
+p_s2 <- ggplot2::ggplot(
+  top10_daly_30_69,
+  ggplot2::aes(
+    x = DALYs_age30_69,
+    y = cause_panel,
+    fill = cluster_name
+  )
+) +
+  ggplot2::geom_col(
+    width = 0.72
+  ) +
+  ggplot2::facet_wrap(
+    ~cluster_name,
+    scales = "free_y",
+    ncol = 1
+  ) +
+  ggplot2::scale_fill_manual(
+    values = cluster_colors,
+    guide = "none"
+  ) +
+  ggplot2::scale_y_discrete(
+    labels = function(x) {
+      sub("___.*$", "", x)
+    }
+  ) +
+  ggplot2::scale_x_continuous(
+    labels = scales::label_number(
+      scale = 1e-6,
+      suffix = " M",
+      accuracy = 0.1
+    )
+  ) +
+  ggplot2::labs(
+    title =
+      "Leading causes of DALYs within each life-course disease cluster, ages 30–69",
+    subtitle =
+      "Supplementary descriptive context; not used to define cluster membership",
+    x = "DALYs (millions)",
+    y = NULL,
+    caption =
+      "Source: GBD 2023, China, Both sexes."
+  ) +
+  ggplot2::theme_bw(
+    base_size = 11
+  ) +
+  ggplot2::theme(
+    panel.grid.minor =
+      ggplot2::element_blank(),
+    panel.grid.major.y =
+      ggplot2::element_blank(),
+    strip.background =
+      ggplot2::element_rect(
+        fill = "grey94",
+        color = "grey75"
+      ),
+    strip.text =
+      ggplot2::element_text(
+        face = "bold"
+      ),
+    plot.title =
+      ggplot2::element_text(
+        face = "bold",
+        size = 14
+      ),
+    plot.subtitle =
+      ggplot2::element_text(
+        color = "grey35"
+      ),
+    plot.caption =
+      ggplot2::element_text(
+        size = 8,
+        color = "grey40",
+        hjust = 0
+      )
+  )
+
+save_plot_pair(
+  p_s2,
+  "FigureS2_age30_69_top10_DALY_causes",
+  width = 12.3,
+  height = 12
+)
+
+# ------------------------------------------------------------------------------
+# 14. Supplementary Table S1 — all four measures at ages 30–69
+# ------------------------------------------------------------------------------
+
+all_measure_30_69 <- classified_data |>
+  dplyr::filter(
+    metric == "Number",
+    age %in% age_30_69
+  ) |>
+  dplyr::group_by(
+    measure,
+    measure_short,
+    cluster_name
+  ) |>
+  dplyr::summarise(
+    estimate =
+      sum(val, na.rm = TRUE),
+    .groups = "drop"
+  ) |>
+  dplyr::group_by(
+    measure,
+    measure_short
+  ) |>
+  dplyr::mutate(
+    classified_total =
+      sum(estimate),
+    share_of_classified =
+      safe_ratio(
+        estimate,
+        classified_total
+      )
+  ) |>
+  dplyr::ungroup() |>
+  dplyr::mutate(
+    measure_short =
+      factor(
+        measure_short,
+        levels = c(
+          "Deaths",
+          "YLLs",
+          "YLDs",
+          "DALYs"
+        )
+      ),
+    cluster_name =
+      factor(
+        cluster_name,
+        levels = cluster_order
+      )
+  ) |>
+  dplyr::arrange(
+    measure_short,
+    cluster_name
+  )
+
+all_causes_30_69 <- analysis_data |>
+  dplyr::filter(
+    cause == "All causes",
+    metric == "Number",
+    age %in% age_30_69
+  ) |>
+  dplyr::group_by(
+    measure,
+    measure_short
+  ) |>
+  dplyr::summarise(
+    all_causes_value =
+      sum(val, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+table_s1 <- all_measure_30_69 |>
+  dplyr::left_join(
+    all_causes_30_69,
+    by = c(
+      "measure",
+      "measure_short"
+    )
+  ) |>
+  dplyr::mutate(
+    share_of_all_causes =
+      safe_ratio(
+        estimate,
+        all_causes_value
+      )
+  )
+
+readr::write_csv(
+  table_s1,
+  file.path(
+    output_dir,
+    "TableS1_age30_69_all_measure_cluster_burden.csv"
+  )
+)
+
+# ------------------------------------------------------------------------------
+# 15. Closure and internal consistency checks
+# ------------------------------------------------------------------------------
+
+closure_all_measure <- table_s1 |>
+  dplyr::group_by(
+    measure,
+    measure_short,
+    all_causes_value
+  ) |>
+  dplyr::summarise(
+    classified_total =
+      sum(estimate),
+    .groups = "drop"
+  ) |>
+  dplyr::mutate(
+    classified_to_all_ratio =
+      safe_ratio(
+        classified_total,
+        all_causes_value
+      )
+  ) |>
+  dplyr::arrange(
+    measure_short
+  )
+
+daly_closure <- tibble::tibble(
+  analysis_window = c(
+    "All ages",
+    "Ages 30–69"
+  ),
+  classified_DALYs = c(
+    daly_all_age_classified_total,
+    daly_30_69_classified_total
+  ),
+  all_causes_DALYs = c(
+    all_causes_daly_all_age,
+    all_causes_daly_30_69
+  )
+) |>
+  dplyr::mutate(
+    classified_to_all_ratio =
+      safe_ratio(
+        classified_DALYs,
+        all_causes_DALYs
+      )
+  )
+
+readr::write_csv(
+  closure_all_measure,
+  file.path(
+    output_dir,
+    "Stage2_age30_69_all_measure_closure.csv"
+  )
+)
+
+readr::write_csv(
+  daly_closure,
+  file.path(
+    output_dir,
+    "Stage2_DALY_all_age_vs_30_69_closure.csv"
+  )
+)
+
+if (
+  any(
+    closure_all_measure$classified_to_all_ratio >
+      1.01
+  )
+) {
+  stop(
+    "Classified burden exceeds GBD All causes by >1%; review aggregation."
+  )
+}
+
+# ------------------------------------------------------------------------------
+# 16. Audit, reproducibility bundle and session information
 # ------------------------------------------------------------------------------
 
 analysis_audit <- tibble::tibble(
@@ -1218,32 +1797,71 @@ analysis_audit <- tibble::tibble(
     "frozen_clustered_causes",
     "unclassified_GBD_causes",
     "excluded_all_zero_DALY_rate_causes",
-    "all_age_groups_used",
+    "all_age_groups_available",
     "age30_69_groups_used",
-    "measures",
+    "measures_available",
     "sex",
-    "year"
+    "year",
+    "classified_DALY_closure_all_ages",
+    "classified_DALY_closure_age30_69"
   ),
   value = c(
     input_file,
     membership_file,
-    as.character(nrow(raw)),
-    as.character(nrow(analysis_data)),
-    as.character(nrow(candidate_gbd_causes)),
-    as.character(nrow(cluster_membership)),
-    as.character(nrow(unclassified_gbd_causes)),
-    as.character(sum(excluded_cause_audit$all_zero_DALY_rate)),
-    as.character(length(age_levels)),
-    as.character(length(age_30_69)),
-    as.character(length(measure_order)),
+    as.character(
+      nrow(raw)
+    ),
+    as.character(
+      nrow(analysis_data)
+    ),
+    as.character(
+      nrow(candidate_gbd_causes)
+    ),
+    as.character(
+      nrow(cluster_membership)
+    ),
+    as.character(
+      nrow(unclassified_gbd_causes)
+    ),
+    as.character(
+      sum(
+        excluded_cause_audit$all_zero_DALY_rate
+      )
+    ),
+    as.character(
+      length(age_levels)
+    ),
+    as.character(
+      length(age_30_69)
+    ),
+    as.character(
+      length(measure_order)
+    ),
     "Both",
-    "2023"
+    "2023",
+    format(
+      daly_closure$classified_to_all_ratio[
+        daly_closure$analysis_window ==
+          "All ages"
+      ],
+      digits = 10
+    ),
+    format(
+      daly_closure$classified_to_all_ratio[
+        daly_closure$analysis_window ==
+          "Ages 30–69"
+      ],
+      digits = 10
+    )
   )
 )
 
 readr::write_csv(
   analysis_audit,
-  file.path(output_dir, "Stage2_data_audit.csv")
+  file.path(
+    output_dir,
+    "Stage2_data_audit.csv"
+  )
 )
 
 saveRDS(
@@ -1255,67 +1873,107 @@ saveRDS(
       sex = "Both",
       cluster_order = cluster_order,
       age_levels = age_levels,
-      age_30_69 = age_30_69
+      age_30_69 = age_30_69,
+      scientific_question = paste0(
+        "How much health loss generated by independently defined life-course ",
+        "disease phenotypes already occurs within ages 30–69?"
+      )
     ),
-    membership = cluster_membership,
-    excluded_cause_audit = excluded_cause_audit,
-    figure2_data = figure2_data,
-    burden_comparison = burden_comparison,
-    closure_windows = closure_windows,
-    age_cluster_rates = age_cluster_rates,
-    age_cluster_shares = age_cluster_shares,
-    cause_burden_30_69 = cause_burden_30_69,
-    top10_30_69 = top10_30_69,
-    cluster_burden_30_69 = cluster_burden_30_69,
-    phenotype_30_69 = phenotype_30_69,
-    top10_daly_all_age = top10_daly_all_age
+    membership =
+      cluster_membership,
+    excluded_cause_audit =
+      excluded_cause_audit,
+    core_daly_summary =
+      core_daly_summary,
+    overall_daly_window_summary =
+      overall_daly_window_summary,
+    phenotype_30_69 =
+      phenotype_30_69,
+    table1 =
+      table1,
+    figure2_data =
+      figure2_data,
+    figure3_data =
+      figure3_data,
+    cause_daly_30_69 =
+      cause_daly_30_69,
+    top10_daly_30_69 =
+      top10_daly_30_69,
+    table_s1 =
+      table_s1,
+    closure_all_measure =
+      closure_all_measure,
+    daly_closure =
+      daly_closure
   ),
-  file.path(output_dir, "Stage2_Figure2_onward_analysis_objects.rds")
+  file.path(
+    output_dir,
+    "Stage2_Redesigned_analysis_objects.rds"
+  )
 )
 
 capture.output(
   utils::sessionInfo(),
-  file = file.path(output_dir, "Stage2_sessionInfo.txt")
+  file = file.path(
+    output_dir,
+    "Stage2_sessionInfo.txt"
+  )
 )
 
 # ------------------------------------------------------------------------------
-# 15. Console summary
+# 17. Console summary
 # ------------------------------------------------------------------------------
 
 cat("\n============================================================\n")
-cat("STAGE 2 FIGURE 2 ONWARD COMPLETE\n")
+cat("STAGE 2 REDESIGNED ANALYSIS COMPLETE\n")
 cat("============================================================\n")
 cat("Clustering rerun: NO\n")
+cat("Scientific focus: health loss at ages 30–69, not formal premature mortality.\n")
 cat("Frozen clustered causes:", nrow(cluster_membership), "\n")
+
 cat("\nCluster counts:\n")
-print(membership_counts)
-cat("\nExcluded-cause audit (304 candidate causes -> 292 clustered + 12 all-zero profiles):\n")
 print(
-  excluded_cause_audit |>
+  membership_counts
+)
+
+cat("\nCore DALY summary:\n")
+print(
+  table1 |>
     dplyr::select(
-      cause,
-      age_cells_observed,
-      nonzero_age_cells,
-      sd_DALY_rate_per_100k,
+      cluster_name,
+      n_causes,
       DALYs_all_ages,
       DALYs_age30_69,
-      exclusion_reason
+      share_of_classified_DALYs_age30_69,
+      proportion_cluster_all_age_DALYs_occurring_age30_69,
+      YLL_fraction_of_YLL_plus_YLD,
+      YLD_fraction_of_YLL_plus_YLD
     )
 )
-cat("\nAll-age vs 30–69 closure against GBD All causes:\n")
-print(closure_windows)
-cat("\n30–69 burden summary:\n")
+
+cat("\nOverall proportion of all-age DALYs occurring at ages 30–69:\n")
 print(
-  cluster_burden_30_69 |>
-    dplyr::select(
-      measure_short,
-      cluster_name,
-      estimate,
-      share_of_classified,
-      share_of_all_causes
-    )
+  overall_daly_window_summary
 )
-cat("\n30–69 fatal/non-fatal DALY profile:\n")
-print(phenotype_30_69)
-cat("\nOutputs saved to: ", normalizePath(output_dir), "\n", sep = "")
+
+cat("\nDALY closure against GBD All causes:\n")
+print(
+  daly_closure
+)
+
+cat("\nAll-measure 30–69 closure:\n")
+print(
+  closure_all_measure
+)
+
+cat(
+  "\nOutputs saved to: ",
+  normalizePath(
+    output_dir,
+    mustWork = FALSE
+  ),
+  "\n",
+  sep = ""
+)
+
 cat("============================================================\n")
