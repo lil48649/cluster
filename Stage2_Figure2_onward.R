@@ -180,7 +180,18 @@ first_existing_file <- function(candidates, label) {
 }
 
 safe_ratio <- function(num, den) {
-  ifelse(is.finite(den) & den != 0, num / den, NA_real_)
+  # Explicitly recycle scalar/vector inputs to a common length.
+  # Base ifelse() returns the length of its test argument; therefore using a
+  # scalar denominator as the test would otherwise collapse a vector ratio to
+  # its first value and dplyr::mutate() would recycle that value across rows.
+  n <- max(length(num), length(den))
+  num <- rep_len(num, n)
+  den <- rep_len(den, n)
+
+  out <- num / den
+  invalid <- !is.finite(den) | den == 0
+  out[invalid] <- NA_real_
+  out
 }
 
 save_plot_pair <- function(plot_object, stem, width, height) {
@@ -817,6 +828,59 @@ overall_daly_window_summary <- tibble::tibble(
         DALYs_all_ages
       )
   )
+
+# Hard validation for the two distinct denominators used in the core result.
+# Panel A must be a composition of the three clusters and therefore sum to 1.
+panelA_sum <- sum(
+  core_daly_summary$share_of_classified_DALYs_age30_69,
+  na.rm = TRUE
+)
+
+if (!isTRUE(all.equal(panelA_sum, 1, tolerance = 1e-10))) {
+  stop(
+    "Core DALY composition error: cluster shares at ages 30–69 sum to ",
+    signif(panelA_sum, 8),
+    " rather than 1."
+  )
+}
+
+if (
+  dplyr::n_distinct(
+    round(
+      core_daly_summary$share_of_classified_DALYs_age30_69,
+      10
+    )
+  ) < 2L
+) {
+  stop(
+    "Core DALY composition error: all cluster shares at ages 30–69 are ",
+    "identical. Review denominator/vector recycling."
+  )
+}
+
+# The sum of cluster shares using GBD All causes as denominator should equal
+# the classified-cause closure ratio, not necessarily exactly 1.
+panelA_all_causes_share_sum <- sum(
+  core_daly_summary$share_of_all_causes_DALYs_age30_69,
+  na.rm = TRUE
+)
+
+expected_panelA_all_causes_share_sum <-
+  daly_30_69_classified_total / all_causes_daly_30_69
+
+if (
+  !isTRUE(
+    all.equal(
+      panelA_all_causes_share_sum,
+      expected_panelA_all_causes_share_sum,
+      tolerance = 1e-10
+    )
+  )
+) {
+  stop(
+    "All-causes denominator check failed for the 30–69 DALY shares."
+  )
+}
 
 readr::write_csv(
   core_daly_summary,
