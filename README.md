@@ -62,17 +62,44 @@ The disease classification is defined only by the completed Stage 1 all-age 2023
 
 ---
 
-## Part 3: 1990–2023 trends at ages 30–69
+## Part 3: premature mortality between ages 30 and 70
 
-Script:
+Primary script:
 
-`Part3_1990_2023_trends.R`
+`Part3_PrematureMortality_SDG34.R`
 
-This analysis keeps the finalized 2023 three-cluster membership fixed and applies it retrospectively to every year from 1990 through 2023. Clustering is never rerun by year.
+The redesigned Part 3 no longer treats ordinary death counts/rates at ages 30–69 as equivalent to premature mortality. It calculates life-table probabilities of dying between exact ages 30 and 70.
 
-### Required trend files
+### Analysis order
 
-Place these seven CSVs in the working directory:
+1. **Primary analysis:** use all 292 frozen Stage 1 causes to calculate cluster-specific `q30–70` for Infant, Adult and Aging-related life-course disease clusters from 1990 to 2023.
+2. **Policy bridge:** calculate the formal combined NCD4 `q30–70` using the frozen 75-cause GBD operationalisation of WHO/UN SDG 3.4.1.
+3. **Linkage:** map the 75 NCD4 causes back to the three life-course clusters.
+4. **Policy anchor:** calculate the 2015 NCD4 baseline, 2023 observed probability and the 2030 SDG target (= two-thirds of the 2015 probability).
+
+The NCD4 trend is required as a policy benchmark, but is not treated as a separate novel descriptive module.
+
+### Frozen NCD4 mapping
+
+The code contains the frozen detailed-cause mapping:
+
+- Cancer: 45 causes
+- Cardiovascular diseases: 18 causes
+- Chronic respiratory diseases: 8 causes
+- Diabetes: 4 causes
+- Total: 75 causes
+
+The WHO/UN ICD-10 scopes used to guide the GBD operationalisation are C00–C97, I00–I99, J30–J98 and E10–E14, respectively.
+
+### Required local inputs
+
+Place the following in one working directory:
+
+- the seven 1990–2023 GBD CSV batches;
+- `Stage2_frozen_cluster_membership_used.csv` (preferred), or an equivalent frozen membership file;
+- `Part3_PrematureMortality_SDG34.R`.
+
+The script accepts the preferred batch names:
 
 - `IHME-GBD_2023_DATA-1990-1994.csv`
 - `IHME-GBD_2023_DATA-1995-1999.csv`
@@ -82,26 +109,26 @@ Place these seven CSVs in the working directory:
 - `IHME-GBD_2023_DATA-2015-2019.csv`
 - `IHME-GBD_2023_DATA-2020-2023.csv`
 
-Each batch should use the same settings: China, Both sexes, ages 30–34 through 65–69, Deaths/YLLs/YLDs/DALYs, Number + Rate, All causes plus all 304 detailed causes, and All Population.
+It can also identify alternative filenames that contain the relevant start and end years.
 
-Because the export is restricted to ages 30–69, GBD is expected to omit **Sudden infant death syndrome** entirely: it has no applicable rows in this age window. Therefore the combined downloaded files contain **303 observed detailed causes**, not 304. This is expected. The script verifies that the only frozen Stage 1 cause absent from the download is Sudden infant death syndrome, restores its 30–69 cells as structural zeros, and continues to use the full frozen 292-cause cluster membership.
+### Core outputs
 
-The script automatically looks for the frozen membership in `Stage2_Figure2_onward_outputs/Stage2_frozen_cluster_membership_used.csv` first, then falls back to the original Stage 1 membership filenames.
+Results are written to:
 
-### Part 3 main outputs
+`Part3_PrematureMortality_outputs/`
 
-- **Figure 6:** Death and DALY trends, showing absolute numbers and standardized rates.
-- **Figure 7:** changing cluster shares of Deaths, YLLs, YLDs and DALYs from 1990 to 2023.
-- **Figure 8:** three-factor Shapley decomposition of the 1990→2023 burden change into population size, age structure and age-specific rates.
-- **Table 2:** 1990 vs 2023 values, percentage changes and EAPC of standardized rates.
-- **Table 3:** Shapley decomposition results for all four measures.
-- Cause-level DALY changes between 1990 and 2023.
-- Yearly closure against GBD `All causes` and historical burden auditing for the 12 causes excluded from the 2023 clustering.
+Key outputs include:
 
-### Rate standardization
+- **Figure 4:** 1990–2023 cluster-specific probability of dying between ages 30 and 70.
+- **Table 2:** cluster-specific 1990, 2015 and 2023 premature-mortality probabilities and changes.
+- `NCD4_frozen_75_cause_mapping.csv`: the frozen 75-cause mapping linked to life-course clusters.
+- `NCD4_q30_70_1990_2023.csv`: formal NCD4 probability series used as the policy benchmark.
+- `NCD4_lifecourse_cluster_linkage_1990_2023.csv`: NCD4 mortality linked back to the three life-course clusters.
+- `NCD4_SDG34_policy_anchor_2015_2023_2030target.csv`: 2015 baseline, 2023 observed level and 2030 SDG target.
+- QC files for omitted zero-death cells and closure against GBD `All causes`.
 
-Because the downloaded data contain eight age-specific rates rather than a pre-computed 30–69 age-standardized rate, Part 3 uses direct standardization with the **GBD 2021 world population age standard**. The published GBD standard percentages for ages 30–34 through 65–69 are:
+### Important interpretation rule
 
-7.32171, 6.82805, 6.14735, 5.51133, 4.91312, 4.34586, 3.68223 and 2.98509.
+The three cluster-specific `q30–70` values are cause-group net probabilities. They are **not additive** and should not be interpreted as percentage shares of the formal NCD4 probability. When composition is needed, the analysis uses death counts rather than ratios of `q30–70`.
 
-These eight weights sum to 41.73474% of the full GBD standard population. Because the analysis is deliberately restricted to ages 30–69, the script re-normalizes these eight weights to sum to 1 before calculating the directly age-standardized 30–69 rate.
+The older `Part3_1990_2023_trends.R` remains in the repository as a legacy/supplementary analysis script for the broader burden-trend, age-standardisation and decomposition work; it is no longer the primary Part 3 framework.
