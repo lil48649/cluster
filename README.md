@@ -142,3 +142,52 @@ The three cluster-specific `q30–70` values are cause-group net probabilities. 
 For China-focused target-gap analyses, the primary within-study target is the Healthy China 2030 relative target: a 30% reduction from 2015, applied to the GBD 2023-based 2015 NCD4 probability to preserve a consistent data system. The official Healthy China Action benchmark (2015 18.5%; 2030 ≤13.0%) is reported separately, while the UN SDG one-third-reduction target is secondary.
 
 The older `Part3_1990_2023_trends.R` remains in the repository as a legacy/supplementary analysis script for the broader burden-trend, age-standardisation and decomposition work; it is no longer the primary Part 3 framework.
+
+---
+
+## Step 4: Level-2 risk-factor prevention counterfactuals
+
+Primary script:
+
+`Step4_RiskCounterfactual/step4_risk_counterfactual.py`
+
+Step 4 preserves the frozen 292-cause life-course membership and links the
+GBD 2023 Level-2 risk-attributable Deaths and DALYs back to the `Infant`,
+`Adult`, and `Aging-related` clusters. For each Level-2 risk separately, it:
+
+1. aggregates detailed-cause attributable Deaths and DALYs within cluster;
+2. subtracts the age-specific attributable death rate from the matching 2023
+   Stage 3 cluster baseline to represent movement to TMREL;
+3. recomputes cluster-specific `q30–70` using the unchanged Stage 3 life-table
+   transformation `5mx / (1 + 2.5mx)`;
+4. calculates the absolute and relative `q30–70` reduction, avoidable deaths,
+   avoidable DALYs at ages 30–69, and the DALY fraction relative to the frozen
+   Stage 2 cluster baseline.
+
+The script validates the exact 20-label Level-2 selection, metadata coverage,
+full-key uniqueness, Number/Rate pairing, uncertainty bounds, implied
+population consistency, frozen membership counts, and complete 60-row
+risk-by-cluster result grid. Raw signed GBD estimates are retained; prevention
+endpoints are bounded at zero and any mortality attribution above its matching
+cluster-age baseline is capped and flagged.
+
+The current counterfactuals are point estimates. Exported lower/upper bounds
+are validated but not summed across causes because valid cluster-level
+uncertainty propagation requires draw-level covariance.
+
+### Required local inputs
+
+- `IHME-GBD_2023_risk.csv`;
+- `Part3_frozen_cluster_membership_used.csv`;
+- `Part3_cluster_age_specific_mortality_1990_2023.csv`;
+- `Stage2_core_DALY_summary.csv`.
+
+See `Step4_RiskCounterfactual/README.md` for the command and output dictionary.
+No third-party Python package is required.
+
+### Non-additivity rule
+
+Every Step 4 result is a separate one-risk TMREL counterfactual. Effects for
+different risks must **not** be summed because GBD risk-attributable burdens
+overlap and may include mediation.
+
