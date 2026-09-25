@@ -1343,40 +1343,11 @@ readr::write_csv(
 # 9. Figure 4 — 1990-2023 cluster-specific premature mortality
 # ------------------------------------------------------------------------------
 #
-# Panel A preserves the common full scale and shows the dominance of the
-# Aging-related cluster. Panel B intentionally repeats only Infant and Adult
-# using an expanded y-axis so that their much smaller probabilities and trends
-# remain visible. Facet-specific y-scales are stated explicitly in the subtitle.
+# Single-panel presentation. The common y-axis is deliberately retained because
+# the large separation between the Aging-related cluster and the other two
+# clusters is itself the primary result. No expanded secondary panel is used.
 
-figure4_panel_levels <- c(
-  "A. All life-course clusters",
-  "B. Infant and adult clusters (expanded scale)"
-)
-
-figure4_plot_data <- dplyr::bind_rows(
-  cluster_q30_70 |>
-    dplyr::mutate(
-      panel = figure4_panel_levels[1]
-    ),
-  cluster_q30_70 |>
-    dplyr::filter(
-      cluster_name %in% c(
-        "Infant",
-        "Adult"
-      )
-    ) |>
-    dplyr::mutate(
-      panel = figure4_panel_levels[2]
-    )
-) |>
-  dplyr::mutate(
-    panel = factor(
-      panel,
-      levels = figure4_panel_levels
-    )
-  )
-
-figure4_label_data <- figure4_plot_data |>
+figure4_label_data <- cluster_q30_70 |>
   dplyr::filter(
     year == 2023
   ) |>
@@ -1388,7 +1359,7 @@ figure4_label_data <- figure4_plot_data |>
   )
 
 p4 <- ggplot2::ggplot(
-  figure4_plot_data,
+  cluster_q30_70,
   ggplot2::aes(
     x = year,
     y = q30_70,
@@ -1404,20 +1375,6 @@ p4 <- ggplot2::ggplot(
     data = figure4_label_data,
     size = 2.3
   ) +
-  ggplot2::geom_text(
-    data = figure4_label_data,
-    ggplot2::aes(
-      label = label
-    ),
-    hjust = -0.15,
-    size = 3.2,
-    show.legend = FALSE
-  ) +
-  ggplot2::facet_wrap(
-    ~ panel,
-    ncol = 1,
-    scales = "free_y"
-  ) +
   ggplot2::scale_color_manual(
     values = cluster_colors,
     breaks = cluster_order,
@@ -1425,10 +1382,10 @@ p4 <- ggplot2::ggplot(
   ) +
   ggplot2::scale_y_continuous(
     labels = scales::percent_format(
-      accuracy = 0.1
+      accuracy = 1
     ),
     expand = ggplot2::expansion(
-      mult = c(0.02, 0.12)
+      mult = c(0.02, 0.08)
     )
   ) +
   ggplot2::scale_x_continuous(
@@ -1440,21 +1397,13 @@ p4 <- ggplot2::ggplot(
       ),
       2023
     ),
-    expand = ggplot2::expansion(
-      mult = c(0.01, 0.10)
-    ),
     minor_breaks = NULL
-  ) +
-  ggplot2::coord_cartesian(
-    clip = "off"
   ) +
   ggplot2::labs(
     title =
       "Probability of dying between ages 30 and 70 by life-course disease cluster",
-    subtitle = paste0(
-      "China, Both sexes, 1990–2023; frozen 2023 cluster membership. ",
-      "Panel B uses an expanded y-axis."
-    ),
+    subtitle =
+      "China, Both sexes, 1990–2023; frozen 2023 cluster membership",
     x = NULL,
     y = "Probability of dying between ages 30 and 70",
     color = "Disease cluster",
@@ -1476,10 +1425,6 @@ p4 <- ggplot2::ggplot(
         color = "grey92",
         linewidth = 0.4
       ),
-    strip.text =
-      ggplot2::element_text(
-        face = "bold"
-      ),
     plot.title =
       ggplot2::element_text(
         face = "bold",
@@ -1494,13 +1439,6 @@ p4 <- ggplot2::ggplot(
         size = 8,
         color = "grey40",
         hjust = 0
-      ),
-    plot.margin =
-      ggplot2::margin(
-        5.5,
-        28,
-        5.5,
-        5.5
       )
   )
 
@@ -1508,7 +1446,7 @@ save_plot_pair(
   p4,
   "Figure4_cluster_q30_70_1990_2023",
   width = 10.5,
-  height = 9.0
+  height = 6.5
 )
 
 # ------------------------------------------------------------------------------
