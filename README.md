@@ -73,9 +73,9 @@ The redesigned Part 3 no longer treats ordinary death counts/rates at ages 30–
 ### Analysis order
 
 1. **Primary analysis:** use all 292 frozen Stage 1 causes to calculate cluster-specific `q30–70` for Infant, Adult and Aging-related life-course disease clusters from 1990 to 2023.
-2. **Policy bridge:** calculate the formal combined NCD4 `q30–70` using the frozen 75-cause GBD operationalisation of WHO/UN SDG 3.4.1.
+2. **Policy bridge:** calculate a GBD 2023-based SDG 3.4.1-equivalent NCD4 `q30–70` using the frozen 75-cause mapping.
 3. **Linkage:** map the 75 NCD4 causes back to the three life-course clusters.
-4. **Policy anchor:** calculate the 2015 NCD4 baseline, 2023 observed probability and the 2030 SDG target (= two-thirds of the 2015 probability).
+4. **Policy anchor:** derive a GBD 2023-based 2030 SDG-equivalent threshold (= two-thirds of the GBD 2015 value) while keeping the official Healthy China benchmark separate.
 
 The NCD4 trend is required as a policy benchmark, but is not treated as a separate novel descriptive module.
 
@@ -119,16 +119,21 @@ Results are written to:
 
 Key outputs include:
 
-- **Figure 4:** 1990–2023 cluster-specific probability of dying between ages 30 and 70.
+- **Figure 4:** two-panel 1990–2023 cluster-specific probability of dying between ages 30 and 70. Panel A shows all three clusters on the full scale; Panel B enlarges Infant and Adult using a separate y-axis.
 - **Table 2:** cluster-specific 1990, 2015 and 2023 premature-mortality probabilities and changes.
 - `NCD4_frozen_75_cause_mapping.csv`: the frozen 75-cause mapping linked to life-course clusters.
-- `NCD4_q30_70_1990_2023.csv`: formal NCD4 probability series used as the policy benchmark.
+- `NCD4_q30_70_1990_2023.csv`: GBD 2023-based NCD4 probability series used as the internal policy benchmark.
 - `NCD4_lifecourse_cluster_linkage_1990_2023.csv`: NCD4 mortality linked back to the three life-course clusters.
-- `NCD4_SDG34_policy_anchor_2015_2023_2030target.csv`: 2015 baseline, 2023 observed level and 2030 SDG target.
+- `NCD4_GBD2023_SDG_equivalent_policy_anchor.csv`: GBD 2015 baseline, 2023 observed value and the model-based 2030 SDG-equivalent threshold.
+- `NCD4_policy_benchmarks_GBD_vs_HealthyChina.csv`: keeps the GBD-derived threshold separate from the official Healthy China benchmark (2015 18.5%; 2030 ≤13.0%).
+- `Sensitivity_COVID19_excluded_cluster_q30_70_1990_2023.csv` and **Figure S3**: COVID-19 exclusion sensitivity analysis for the Aging-related cluster.
+- `Diagnostic_Infant_2008_spike_top15.csv`: diagnostic ranking of causes associated with the 2008 Infant-cluster spike.
 - QC files for omitted zero-death cells and closure against GBD `All causes`.
 
 ### Important interpretation rule
 
-The three cluster-specific `q30–70` values are cause-group net probabilities. They are **not additive** and should not be interpreted as percentage shares of the formal NCD4 probability. When composition is needed, the analysis uses death counts rather than ratios of `q30–70`.
+The three cluster-specific `q30–70` values are cause-group net probabilities. They are **not additive** and should not be interpreted as percentage shares of the combined GBD-based NCD4 probability. When composition is needed, the analysis uses death counts rather than ratios of `q30–70`.
+
+The GBD-derived 2030 SDG-equivalent threshold is an internal model-based benchmark, not China's official target value. The official Healthy China Action (2019–2030) benchmark is retained separately.
 
 The older `Part3_1990_2023_trends.R` remains in the repository as a legacy/supplementary analysis script for the broader burden-trend, age-standardisation and decomposition work; it is no longer the primary Part 3 framework.
