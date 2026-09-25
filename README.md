@@ -75,7 +75,7 @@ The redesigned Part 3 no longer treats ordinary death counts/rates at ages 30–
 1. **Primary analysis:** use all 292 frozen Stage 1 causes to calculate cluster-specific `q30–70` for Infant, Adult and Aging-related life-course disease clusters from 1990 to 2023.
 2. **Policy bridge:** calculate a GBD 2023-based SDG 3.4.1-equivalent NCD4 `q30–70` using the frozen 75-cause mapping.
 3. **Linkage:** map the 75 NCD4 causes back to the three life-course clusters.
-4. **Policy anchor:** derive a GBD 2023-based 2030 SDG-equivalent threshold (= two-thirds of the GBD 2015 value) while keeping the official Healthy China benchmark separate.
+4. **Policy anchor:** use Healthy China 2030 as the primary China-specific target. For GBD-consistent target-gap calculations, apply a 30% reduction to the GBD 2023-based 2015 NCD4 probability. Keep the official national benchmark (2015 18.5%; 2030 ≤13.0%) as an external surveillance-based reference, and retain the UN SDG one-third reduction only as a secondary international sensitivity benchmark.
 
 The NCD4 trend is required as a policy benchmark, but is not treated as a separate novel descriptive module.
 
@@ -119,13 +119,13 @@ Results are written to:
 
 Key outputs include:
 
-- **Figure 4:** two-panel 1990–2023 cluster-specific probability of dying between ages 30 and 70. Panel A shows all three clusters on the full scale; Panel B enlarges Infant and Adult using a separate y-axis.
+- **Figure 4:** single-panel 1990–2023 cluster-specific probability of dying between ages 30 and 70 using a common y-axis for all three clusters.
 - **Table 2:** cluster-specific 1990, 2015 and 2023 premature-mortality probabilities and changes.
 - `NCD4_frozen_75_cause_mapping.csv`: the frozen 75-cause mapping linked to life-course clusters.
 - `NCD4_q30_70_1990_2023.csv`: GBD 2023-based NCD4 probability series used as the internal policy benchmark.
 - `NCD4_lifecourse_cluster_linkage_1990_2023.csv`: NCD4 mortality linked back to the three life-course clusters.
-- `NCD4_GBD2023_SDG_equivalent_policy_anchor.csv`: GBD 2015 baseline, 2023 observed value and the model-based 2030 SDG-equivalent threshold.
-- `NCD4_policy_benchmarks_GBD_vs_HealthyChina.csv`: keeps the GBD-derived threshold separate from the official Healthy China benchmark (2015 18.5%; 2030 ≤13.0%).
+- `NCD4_GBD2023_HealthyChina_harmonised_policy_anchor.csv`: GBD 2015 baseline, 2023 observed value and the primary GBD-harmonised Healthy China target (30% reduction from 2015).
+- `NCD4_policy_benchmarks_HealthyChina_and_SDG.csv`: separates the GBD-harmonised Healthy China target, the official Healthy China benchmark (2015 18.5%; 2030 ≤13.0%), and the secondary UN SDG one-third-reduction benchmark.
 - `Sensitivity_COVID19_excluded_cluster_q30_70_1990_2023.csv` and **Figure S3**: COVID-19 exclusion sensitivity analysis for the Aging-related cluster.
 - `Diagnostic_Infant_2008_spike_top15.csv`: diagnostic ranking of causes associated with the 2008 Infant-cluster spike.
 - QC files for omitted zero-death cells and closure against GBD `All causes`.
@@ -134,6 +134,6 @@ Key outputs include:
 
 The three cluster-specific `q30–70` values are cause-group net probabilities. They are **not additive** and should not be interpreted as percentage shares of the combined GBD-based NCD4 probability. When composition is needed, the analysis uses death counts rather than ratios of `q30–70`.
 
-The GBD-derived 2030 SDG-equivalent threshold is an internal model-based benchmark, not China's official target value. The official Healthy China Action (2019–2030) benchmark is retained separately.
+For China-focused target-gap analyses, the primary within-study target is the Healthy China 2030 relative target: a 30% reduction from 2015, applied to the GBD 2023-based 2015 NCD4 probability to preserve a consistent data system. The official Healthy China Action benchmark (2015 18.5%; 2030 ≤13.0%) is reported separately, while the UN SDG one-third-reduction target is secondary.
 
 The older `Part3_1990_2023_trends.R` remains in the repository as a legacy/supplementary analysis script for the broader burden-trend, age-standardisation and decomposition work; it is no longer the primary Part 3 framework.
