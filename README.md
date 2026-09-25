@@ -76,6 +76,7 @@ The redesigned Part 3 no longer treats ordinary death counts/rates at ages 30–
 2. **Policy bridge:** calculate a GBD 2023-based SDG 3.4.1-equivalent NCD4 `q30–70` using the frozen 75-cause mapping.
 3. **Linkage:** map the 75 NCD4 causes back to the three life-course clusters.
 4. **Policy anchor:** use Healthy China 2030 as the primary China-specific target. For GBD-consistent target-gap calculations, apply a 30% reduction to the GBD 2023-based 2015 NCD4 probability. Keep the official national benchmark (2015 18.5%; 2030 ≤13.0%) as an external surveillance-based reference, and retain the UN SDG one-third reduction only as a secondary international sensitivity benchmark.
+5. **2030 BAU projection:** estimate the 2010–2023 log-linear average annual rate of change (AARC) in the GBD-based NCD4 `q30–70`, anchor the projection at the observed 2023 value, and extrapolate to 2030. Sensitivity projections use the 2010–2019 pre-pandemic and 2000–2023 long-term trends.
 
 The NCD4 trend is required as a policy benchmark, but is not treated as a separate novel descriptive module.
 
@@ -126,6 +127,10 @@ Key outputs include:
 - `NCD4_lifecourse_cluster_linkage_1990_2023.csv`: NCD4 mortality linked back to the three life-course clusters.
 - `NCD4_GBD2023_HealthyChina_harmonised_policy_anchor.csv`: GBD 2015 baseline, 2023 observed value and the primary GBD-harmonised Healthy China target (30% reduction from 2015).
 - `NCD4_policy_benchmarks_HealthyChina_and_SDG.csv`: separates the GBD-harmonised Healthy China target, the official Healthy China benchmark (2015 18.5%; 2030 ≤13.0%), and the secondary UN SDG one-third-reduction benchmark.
+- `NCD4_BAU_projection_model_diagnostics.csv`: AARC, slope uncertainty and model fit for the primary and sensitivity trend windows.
+- `NCD4_BAU_projection_2024_2030.csv`: annual BAU projections through 2030.
+- `NCD4_2030_target_attainment_summary.csv`: projected 2030 NCD4 probability, reduction versus 2015, Healthy China target attainment and target gap for each trend window.
+- **Figure 5:** observed 2010–2023 NCD4 probability, primary BAU projection to 2030, sensitivity trajectories and the GBD-harmonised Healthy China target.
 - `Sensitivity_COVID19_excluded_cluster_q30_70_1990_2023.csv` and **Figure S3**: COVID-19 exclusion sensitivity analysis for the Aging-related cluster.
 - `Diagnostic_Infant_2008_spike_top15.csv`: diagnostic ranking of causes associated with the 2008 Infant-cluster spike.
 - QC files for omitted zero-death cells and closure against GBD `All causes`.
