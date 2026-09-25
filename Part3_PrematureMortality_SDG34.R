@@ -30,6 +30,14 @@
 #      The UN SDG 3.4 one-third reduction is retained only as a secondary
 #      international sensitivity benchmark.
 #
+#   E. 2030 BUSINESS-AS-USUAL (BAU) PROJECTION:
+#      Project the GBD-based NCD4 q30-70 to 2030 using a log-linear average
+#      annual rate of change (AARC) estimated from 2010-2023, matching the
+#      recent GBD 2023 China projection approach. Sensitivity slopes use
+#      2010-2019 (pre-pandemic) and 2000-2023 (long-term). All projections are
+#      anchored at the observed 2023 q30-70, then compared with the primary
+#      GBD-harmonised Healthy China target.
+#
 # IMPORTANT INTERPRETATION
 #   - The three cluster-specific probabilities are cause-group NET probabilities
 #     calculated with the same life-table transformation used by SDG 3.4.1.
@@ -2574,7 +2582,551 @@ readr::write_csv(
 )
 
 # ------------------------------------------------------------------------------
-# 17. Compact analysis audit and reproducibility bundle
+# 17. 2030 business-as-usual projection and target attainment
+# ------------------------------------------------------------------------------
+#
+# Primary forecasting method:
+#   A log-linear model is fitted to annual GBD-based NCD4 q30-70 values from
+#   2010 through 2023:
+#
+#       log(q_t) = alpha + beta * year
+#       AARC = exp(beta) - 1
+#
+#   The estimated AARC is then applied from the observed 2023 q30-70:
+#
+#       q_hat_t = q_2023 * (1 + AARC)^(t - 2023)
+#
+#   This mirrors the recent GBD 2023 China premature-mortality projection
+#   strategy that extrapolates the 2010-2023 average annual change rate.
+#
+# Sensitivity projections:
+#   - 2010-2019: pre-pandemic trend, applied from the observed 2023 baseline.
+#   - 2000-2023: longer-term trend, applied from the observed 2023 baseline.
+#
+# The 95% "trend interval" below reflects uncertainty in the fitted log-linear
+# slope only. It is NOT a full GBD uncertainty interval and does not propagate
+# uncertainty in the underlying GBD mortality estimates.
+
+projection_windows <- tibble::tribble(
+  ~model_id, ~model_label, ~start_year, ~end_year, ~analysis_role,
+  "primary_2010_2023",
+  "2010-2023 recent trend",
+  2010L,
+  2023L,
+  "PRIMARY",
+  "sensitivity_2010_2019",
+  "2010-2019 pre-pandemic trend",
+  2010L,
+  2019L,
+  "SENSITIVITY",
+  "sensitivity_2000_2023",
+  "2000-2023 long-term trend",
+  2000L,
+  2023L,
+  "SENSITIVITY"
+)
+
+fit_loglinear_aarc <- function(
+  data,
+  start_year,
+  end_year
+) {
+  d <- data |>
+    dplyr::filter(
+      year >= start_year,
+      year <= end_year,
+      is.finite(q30_70),
+      q30_70 > 0
+    ) |>
+    dplyr::arrange(year)
+
+  expected_n <-
+    end_year -
+      start_year +
+      1L
+
+  if (nrow(d) != expected_n) {
+    stop(
+      "Projection window ",
+      start_year,
+      "-",
+      end_year,
+      " contains ",
+      nrow(d),
+      " usable annual observations; expected ",
+      expected_n,
+      "."
+    )
+  }
+
+  fit <- stats::lm(
+    log(q30_70) ~ year,
+    data = d
+  )
+
+  sm <- summary(fit)
+
+  beta <-
+    unname(
+      stats::coef(fit)[["year"]]
+    )
+
+  beta_se <-
+    sm$coefficients[
+      "year",
+      "Std. Error"
+    ]
+
+  beta_p <-
+    sm$coefficients[
+      "year",
+      "Pr(>|t|)"
+    ]
+
+  beta_lower95 <-
+    beta -
+      1.96 *
+        beta_se
+
+  beta_upper95 <-
+    beta +
+      1.96 *
+        beta_se
+
+  tibble::tibble(
+    start_year =
+      start_year,
+    end_year =
+      end_year,
+    n_years =
+      nrow(d),
+    beta_log_scale =
+      beta,
+    beta_se =
+      beta_se,
+    beta_lower95 =
+      beta_lower95,
+    beta_upper95 =
+      beta_upper95,
+    AARC =
+      exp(beta) - 1,
+    AARC_percent =
+      100 *
+        (
+          exp(beta) - 1
+        ),
+    AARC_lower95 =
+      exp(beta_lower95) - 1,
+    AARC_upper95 =
+      exp(beta_upper95) - 1,
+    AARC_lower95_percent =
+      100 *
+        (
+          exp(beta_lower95) - 1
+        ),
+    AARC_upper95_percent =
+      100 *
+        (
+          exp(beta_upper95) - 1
+        ),
+    slope_p_value =
+      beta_p,
+    model_R2 =
+      sm$r.squared,
+    residual_sigma =
+      sm$sigma
+  )
+}
+
+projection_model_fits <- lapply(
+  seq_len(
+    nrow(projection_windows)
+  ),
+  function(i) {
+    w <- projection_windows[i, ]
+
+    fit_loglinear_aarc(
+      ncd4_q30_70,
+      w$start_year,
+      w$end_year
+    ) |>
+      dplyr::mutate(
+        model_id =
+          w$model_id,
+        model_label =
+          w$model_label,
+        analysis_role =
+          w$analysis_role,
+        .before = 1
+      )
+  }
+) |>
+  dplyr::bind_rows()
+
+if (
+  any(
+    !is.finite(
+      projection_model_fits$AARC
+    )
+  )
+) {
+  stop(
+    "At least one BAU projection model produced a non-finite AARC."
+  )
+}
+
+future_years <- 2024:2030
+
+projection_2024_2030 <- projection_model_fits |>
+  dplyr::select(
+    model_id,
+    model_label,
+    analysis_role,
+    start_year,
+    end_year,
+    AARC,
+    AARC_percent,
+    AARC_lower95,
+    AARC_upper95,
+    model_R2
+  ) |>
+  tidyr::crossing(
+    year = future_years
+  ) |>
+  dplyr::mutate(
+    q30_70_projected =
+      q2023_gbd *
+        (
+          1 + AARC
+        )^(
+          year - 2023
+        ),
+    q30_70_projected_trend_lower =
+      q2023_gbd *
+        (
+          1 + AARC_lower95
+        )^(
+          year - 2023
+        ),
+    q30_70_projected_trend_upper =
+      q2023_gbd *
+        (
+          1 + AARC_upper95
+        )^(
+          year - 2023
+        ),
+    probability_percent_projected =
+      100 *
+        q30_70_projected,
+    probability_percent_projected_trend_lower =
+      100 *
+        q30_70_projected_trend_lower,
+    probability_percent_projected_trend_upper =
+      100 *
+        q30_70_projected_trend_upper
+  ) |>
+  dplyr::arrange(
+    factor(
+      analysis_role,
+      levels = c(
+        "PRIMARY",
+        "SENSITIVITY"
+      )
+    ),
+    model_id,
+    year
+  )
+
+projection_2030_summary <- projection_2024_2030 |>
+  dplyr::filter(
+    year == 2030L
+  ) |>
+  dplyr::mutate(
+    q30_70_2015_GBD =
+      q2015_gbd,
+    q30_70_2023_GBD =
+      q2023_gbd,
+    primary_HealthyChina_target =
+      q2030_gbd_healthy_china_target,
+    secondary_SDG_equivalent_threshold =
+      q2030_gbd_sdg_equivalent_threshold,
+    projected_reduction_fraction_vs_2015 =
+      1 -
+        safe_ratio(
+          q30_70_projected,
+          q2015_gbd
+        ),
+    projected_reduction_percent_vs_2015 =
+      100 *
+        projected_reduction_fraction_vs_2015,
+    meets_primary_GBD_HealthyChina_target =
+      q30_70_projected <=
+        q2030_gbd_healthy_china_target,
+    signed_gap_to_primary_target =
+      q30_70_projected -
+        q2030_gbd_healthy_china_target,
+    gap_to_primary_target =
+      pmax(
+        signed_gap_to_primary_target,
+        0
+      ),
+    gap_to_primary_target_percentage_points =
+      100 *
+        gap_to_primary_target,
+    margin_below_primary_target_percentage_points =
+      100 *
+        pmax(
+          -signed_gap_to_primary_target,
+          0
+        ),
+    meets_secondary_GBD_SDG_threshold =
+      q30_70_projected <=
+        q2030_gbd_sdg_equivalent_threshold,
+    projected_reduction_from_2023_percent =
+      100 *
+        (
+          1 -
+            safe_ratio(
+              q30_70_projected,
+              q2023_gbd
+            )
+        )
+  ) |>
+  dplyr::select(
+    model_id,
+    model_label,
+    analysis_role,
+    start_year,
+    end_year,
+    AARC_percent,
+    model_R2,
+    q30_70_2015_GBD,
+    q30_70_2023_GBD,
+    q30_70_projected,
+    probability_percent_projected,
+    q30_70_projected_trend_lower,
+    q30_70_projected_trend_upper,
+    projected_reduction_percent_vs_2015,
+    primary_HealthyChina_target,
+    meets_primary_GBD_HealthyChina_target,
+    signed_gap_to_primary_target,
+    gap_to_primary_target_percentage_points,
+    margin_below_primary_target_percentage_points,
+    secondary_SDG_equivalent_threshold,
+    meets_secondary_GBD_SDG_threshold,
+    projected_reduction_from_2023_percent
+  )
+
+primary_2030_result <- projection_2030_summary |>
+  dplyr::filter(
+    analysis_role == "PRIMARY"
+  )
+
+if (nrow(primary_2030_result) != 1L) {
+  stop(
+    "Exactly one primary BAU projection is required."
+  )
+}
+
+readr::write_csv(
+  projection_model_fits,
+  file.path(
+    output_dir,
+    "NCD4_BAU_projection_model_diagnostics.csv"
+  )
+)
+
+readr::write_csv(
+  projection_2024_2030,
+  file.path(
+    output_dir,
+    "NCD4_BAU_projection_2024_2030.csv"
+  )
+)
+
+readr::write_csv(
+  projection_2030_summary,
+  file.path(
+    output_dir,
+    "NCD4_2030_target_attainment_summary.csv"
+  )
+)
+
+# Base policy figure. This figure can later be extended with risk-factor
+# intervention scenarios without changing the primary BAU definition.
+
+projection_plot_observed <- ncd4_q30_70 |>
+  dplyr::filter(
+    year >= 2010L
+  ) |>
+  dplyr::transmute(
+    year,
+    q30_70,
+    series =
+      "Observed GBD 2023-based NCD4"
+  )
+
+projection_plot_primary <- projection_2024_2030 |>
+  dplyr::filter(
+    analysis_role == "PRIMARY"
+  ) |>
+  dplyr::transmute(
+    year,
+    q30_70 =
+      q30_70_projected,
+    q_lower =
+      q30_70_projected_trend_lower,
+    q_upper =
+      q30_70_projected_trend_upper,
+    series =
+      "BAU projection (2010-2023 trend)"
+  )
+
+projection_plot_sensitivity <- projection_2024_2030 |>
+  dplyr::filter(
+    analysis_role == "SENSITIVITY"
+  ) |>
+  dplyr::transmute(
+    year,
+    q30_70 =
+      q30_70_projected,
+    model_label
+  )
+
+p5 <- ggplot2::ggplot() +
+  ggplot2::geom_line(
+    data =
+      projection_plot_observed,
+    ggplot2::aes(
+      x = year,
+      y = q30_70
+    ),
+    linewidth = 1.0
+  ) +
+  ggplot2::geom_point(
+    data =
+      projection_plot_observed |>
+        dplyr::filter(
+          year == 2023L
+        ),
+    ggplot2::aes(
+      x = year,
+      y = q30_70
+    ),
+    size = 2.6
+  ) +
+  ggplot2::geom_ribbon(
+    data =
+      projection_plot_primary,
+    ggplot2::aes(
+      x = year,
+      ymin = q_lower,
+      ymax = q_upper
+    ),
+    alpha = 0.15
+  ) +
+  ggplot2::geom_line(
+    data =
+      projection_plot_primary,
+    ggplot2::aes(
+      x = year,
+      y = q30_70
+    ),
+    linewidth = 1.1,
+    linetype = "solid"
+  ) +
+  ggplot2::geom_line(
+    data =
+      projection_plot_sensitivity,
+    ggplot2::aes(
+      x = year,
+      y = q30_70,
+      linetype = model_label,
+      group = model_label
+    ),
+    linewidth = 0.8
+  ) +
+  ggplot2::geom_hline(
+    yintercept =
+      q2030_gbd_healthy_china_target,
+    linetype = "dashed",
+    linewidth = 0.9
+  ) +
+  ggplot2::annotate(
+    "text",
+    x = 2029.8,
+    y =
+      q2030_gbd_healthy_china_target,
+    label =
+      "GBD-harmonised Healthy China 2030 target",
+    hjust = 1,
+    vjust = -0.55,
+    size = 3.1
+  ) +
+  ggplot2::scale_y_continuous(
+    labels =
+      scales::percent_format(
+        accuracy = 0.1
+      )
+  ) +
+  ggplot2::scale_x_continuous(
+    breaks =
+      c(
+        2010L,
+        2015L,
+        2020L,
+        2023L,
+        2025L,
+        2030L
+      ),
+    minor_breaks = NULL
+  ) +
+  ggplot2::labs(
+    title =
+      "Projected NCD4 premature mortality to 2030 under business as usual",
+    subtitle = paste0(
+      "Primary projection uses the 2010–2023 log-linear AARC; ",
+      "alternative windows are sensitivity analyses"
+    ),
+    x = NULL,
+    y =
+      "Probability of dying between ages 30 and 70",
+    linetype =
+      "Sensitivity trend window",
+    caption = paste0(
+      "Primary target: 30% reduction from the GBD 2023-based 2015 value, ",
+      "harmonising the Healthy China 2030 relative target with the GBD series. ",
+      "The shaded interval reflects slope uncertainty only, not full GBD uncertainty."
+    )
+  ) +
+  ggplot2::theme_bw(
+    base_size = 12.5
+  ) +
+  ggplot2::theme(
+    legend.position = "bottom",
+    panel.grid.minor =
+      ggplot2::element_blank(),
+    plot.title =
+      ggplot2::element_text(
+        face = "bold"
+      ),
+    plot.caption =
+      ggplot2::element_text(
+        size = 8,
+        color = "grey40",
+        hjust = 0
+      )
+  )
+
+save_plot_pair(
+  p5,
+  "Figure5_NCD4_BAU_HealthyChina_target_projection",
+  width = 10.0,
+  height = 6.5
+)
+
+# ------------------------------------------------------------------------------
+# 18. Compact analysis audit and reproducibility bundle
 # ------------------------------------------------------------------------------
 
 analysis_audit <- tibble::tibble(
@@ -2594,7 +3146,9 @@ analysis_audit <- tibble::tibble(
     "Chronic_respiratory_causes",
     "Diabetes_causes",
     "cluster_q30_70_age_groups_per_estimate",
-    "GBD_based_NCD4_q30_70_age_groups_per_estimate"
+    "GBD_based_NCD4_q30_70_age_groups_per_estimate",
+    "BAU_primary_projection_window",
+    "BAU_sensitivity_projection_windows"
   ),
   value = c(
     paste(input_files, collapse = " | "),
@@ -2635,7 +3189,9 @@ analysis_audit <- tibble::tibble(
       expected_ncd4_counts["Diabetes"]
     ),
     "8",
-    "8"
+    "8",
+    "2010-2023 log-linear AARC",
+    "2010-2019 pre-pandemic | 2000-2023 long-term"
   )
 )
 
@@ -2685,6 +3241,12 @@ saveRDS(
       gbd_healthy_china_policy_anchor,
     policy_benchmarks =
       policy_benchmarks,
+    projection_model_fits =
+      projection_model_fits,
+    projection_2024_2030 =
+      projection_2024_2030,
+    projection_2030_summary =
+      projection_2030_summary,
     covid_sensitivity =
       covid_sensitivity,
     infant_2008_diagnostic =
@@ -2708,7 +3270,7 @@ capture.output(
 
 
 # ------------------------------------------------------------------------------
-# 18. Console summary
+# 19. Console summary
 # ------------------------------------------------------------------------------
 
 cat("\n============================================================\n")
@@ -2741,6 +3303,21 @@ print(
 cat("\nPolicy benchmarks: Healthy China primary / official benchmark / SDG sensitivity:\n")
 print(
   policy_benchmarks
+)
+
+cat("\n2030 BAU projection and Healthy China target attainment:\n")
+print(
+  projection_2030_summary |>
+    dplyr::select(
+      model_label,
+      analysis_role,
+      AARC_percent,
+      probability_percent_projected,
+      projected_reduction_percent_vs_2015,
+      meets_primary_GBD_HealthyChina_target,
+      gap_to_primary_target_percentage_points,
+      meets_secondary_GBD_SDG_threshold
+    )
 )
 
 cat("\nCOVID-19 sensitivity for Aging-related cluster, 2020-2023:\n")
