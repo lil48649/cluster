@@ -13,24 +13,25 @@
 #      premature mortality.
 #
 #   B. POLICY BRIDGE:
-#      Calculate the formal NCD4 probability of dying between ages 30 and 70
-#      using a frozen 75-cause GBD operationalisation of WHO/UN SDG 3.4.1.
-#      NCD4 is calculated because it provides the 2015 baseline and 2030 policy
-#      target; it is NOT treated as a separate novel descriptive module.
+#      Calculate a GBD 2023-based SDG 3.4.1-equivalent NCD4 probability of
+#      dying between ages 30 and 70 using the frozen 75-cause mapping.
+#      This is a policy benchmark, NOT a separate novel descriptive module.
 #
 #   C. LINKAGE:
 #      Link the 75 NCD4 causes back to the frozen life-course clusters to show
 #      which phenotype carries NCD4 mortality.
 #
 #   D. POLICY ANCHOR:
-#      Calculate the 2015 NCD4 baseline, 2023 observed value and the 2030 SDG
-#      target (= two-thirds of the 2015 probability).
+#      Calculate the GBD 2023-based 2015 NCD4 baseline, 2023 observed value and
+#      an SDG-equivalent 2030 threshold (= two-thirds of the GBD 2015 value).
+#      Keep the official Healthy China benchmark (18.5% in 2015; <=13.0% in
+#      2030) separate rather than mixing the two estimation systems.
 #
 # IMPORTANT INTERPRETATION
 #   - The three cluster-specific probabilities are cause-group NET probabilities
 #     calculated with the same life-table transformation used by SDG 3.4.1.
 #   - They must NOT be added together and must NOT be interpreted as shares of
-#     the formal SDG 3.4.1 probability because the probability transformation
+#     the combined GBD-based NCD4 probability because the probability transformation
 #     is nonlinear.
 #   - When a composition is needed, this script uses Deaths Number, not ratios
 #     of the cluster-specific q30-70 values.
@@ -1341,24 +1342,53 @@ readr::write_csv(
 # ------------------------------------------------------------------------------
 # 9. Figure 4 — 1990-2023 cluster-specific premature mortality
 # ------------------------------------------------------------------------------
+#
+# Panel A preserves the common full scale and shows the dominance of the
+# Aging-related cluster. Panel B intentionally repeats only Infant and Adult
+# using an expanded y-axis so that their much smaller probabilities and trends
+# remain visible. Facet-specific y-scales are stated explicitly in the subtitle.
 
-figure4_label_data <- cluster_q30_70 |>
+figure4_panel_levels <- c(
+  "A. All life-course clusters",
+  "B. Infant and adult clusters (expanded scale)"
+)
+
+figure4_plot_data <- dplyr::bind_rows(
+  cluster_q30_70 |>
+    dplyr::mutate(
+      panel = figure4_panel_levels[1]
+    ),
+  cluster_q30_70 |>
+    dplyr::filter(
+      cluster_name %in% c(
+        "Infant",
+        "Adult"
+      )
+    ) |>
+    dplyr::mutate(
+      panel = figure4_panel_levels[2]
+    )
+) |>
+  dplyr::mutate(
+    panel = factor(
+      panel,
+      levels = figure4_panel_levels
+    )
+  )
+
+figure4_label_data <- figure4_plot_data |>
   dplyr::filter(
     year == 2023
   ) |>
   dplyr::mutate(
-    label = paste0(
-      cluster_name,
-      ": ",
-      scales::percent(
-        q30_70,
-        accuracy = 0.1
-      )
+    label = scales::percent(
+      q30_70,
+      accuracy = 0.1
     )
   )
 
 p4 <- ggplot2::ggplot(
-  cluster_q30_70,
+  figure4_plot_data,
   ggplot2::aes(
     x = year,
     y = q30_70,
@@ -1367,12 +1397,26 @@ p4 <- ggplot2::ggplot(
   )
 ) +
   ggplot2::geom_line(
-    linewidth = 1.1,
+    linewidth = 1.05,
     lineend = "round"
   ) +
   ggplot2::geom_point(
     data = figure4_label_data,
-    size = 2.5
+    size = 2.3
+  ) +
+  ggplot2::geom_text(
+    data = figure4_label_data,
+    ggplot2::aes(
+      label = label
+    ),
+    hjust = -0.15,
+    size = 3.2,
+    show.legend = FALSE
+  ) +
+  ggplot2::facet_wrap(
+    ~ panel,
+    ncol = 1,
+    scales = "free_y"
   ) +
   ggplot2::scale_color_manual(
     values = cluster_colors,
@@ -1381,25 +1425,36 @@ p4 <- ggplot2::ggplot(
   ) +
   ggplot2::scale_y_continuous(
     labels = scales::percent_format(
-      accuracy = 1
+      accuracy = 0.1
     ),
     expand = ggplot2::expansion(
-      mult = c(0.02, 0.10)
+      mult = c(0.02, 0.12)
     )
   ) +
   ggplot2::scale_x_continuous(
-    breaks = seq(
-      1990,
-      2020,
-      by = 5
+    breaks = c(
+      seq(
+        1990,
+        2020,
+        by = 5
+      ),
+      2023
+    ),
+    expand = ggplot2::expansion(
+      mult = c(0.01, 0.10)
     ),
     minor_breaks = NULL
+  ) +
+  ggplot2::coord_cartesian(
+    clip = "off"
   ) +
   ggplot2::labs(
     title =
       "Probability of dying between ages 30 and 70 by life-course disease cluster",
-    subtitle =
-      "China, Both sexes, 1990–2023; frozen 2023 cluster membership",
+    subtitle = paste0(
+      "China, Both sexes, 1990–2023; frozen 2023 cluster membership. ",
+      "Panel B uses an expanded y-axis."
+    ),
     x = NULL,
     y = "Probability of dying between ages 30 and 70",
     color = "Disease cluster",
@@ -1421,6 +1476,10 @@ p4 <- ggplot2::ggplot(
         color = "grey92",
         linewidth = 0.4
       ),
+    strip.text =
+      ggplot2::element_text(
+        face = "bold"
+      ),
     plot.title =
       ggplot2::element_text(
         face = "bold",
@@ -1435,6 +1494,13 @@ p4 <- ggplot2::ggplot(
         size = 8,
         color = "grey40",
         hjust = 0
+      ),
+    plot.margin =
+      ggplot2::margin(
+        5.5,
+        28,
+        5.5,
+        5.5
       )
   )
 
@@ -1442,9 +1508,8 @@ save_plot_pair(
   p4,
   "Figure4_cluster_q30_70_1990_2023",
   width = 10.5,
-  height = 6.5
+  height = 9.0
 )
-
 
 # ------------------------------------------------------------------------------
 # 10. Table 2 — key-year cluster premature-mortality results
@@ -1514,6 +1579,338 @@ readr::write_csv(
   file.path(
     output_dir,
     "Table2_cluster_premature_mortality_key_years.csv"
+  )
+)
+
+
+# ------------------------------------------------------------------------------
+# 10A. Sensitivity analysis — exclude COVID-19 from the frozen clusters
+# ------------------------------------------------------------------------------
+#
+# COVID-19 is classified as Aging-related by the frozen Stage 1 membership.
+# Because the 2021-2022 Aging-related trajectory shows a visible rebound, this
+# sensitivity analysis recomputes all three cluster probabilities after removing
+# COVID-19. The NCD4 series itself is unchanged because COVID-19 is not one of
+# the frozen 75 NCD4 causes.
+
+covid_cause <- "COVID-19"
+
+covid_cluster <- cluster_membership |>
+  dplyr::filter(
+    cause == covid_cause
+  ) |>
+  dplyr::pull(cluster_name) |>
+  as.character()
+
+if (
+  length(covid_cluster) != 1L ||
+    covid_cluster != "Aging-related"
+) {
+  stop(
+    "COVID-19 is expected to map uniquely to the Aging-related cluster."
+  )
+}
+
+cluster_age_mortality_no_covid <- classified_deaths |>
+  dplyr::filter(
+    cause != covid_cause
+  ) |>
+  dplyr::group_by(
+    year,
+    cluster_name,
+    age,
+    age_index,
+    age_start
+  ) |>
+  dplyr::summarise(
+    death_number =
+      sum(Number, na.rm = TRUE),
+    death_rate_per_100k =
+      sum(Rate, na.rm = TRUE),
+    .groups = "drop"
+  ) |>
+  dplyr::mutate(
+    mx =
+      death_rate_per_100k /
+        100000,
+    q5 =
+      (5 * mx) /
+        (1 + 2.5 * mx)
+  )
+
+cluster_q30_70_no_covid <- cluster_age_mortality_no_covid |>
+  dplyr::group_by(
+    year,
+    cluster_name
+  ) |>
+  dplyr::summarise(
+    n_age_groups =
+      dplyr::n(),
+    q30_70_excluding_COVID19 =
+      1 - prod(1 - q5),
+    deaths_age30_69_excluding_COVID19 =
+      sum(death_number),
+    .groups = "drop"
+  ) |>
+  dplyr::mutate(
+    cluster_name = factor(
+      cluster_name,
+      levels = cluster_order
+    )
+  )
+
+if (
+  any(
+    cluster_q30_70_no_covid$n_age_groups !=
+      length(age_30_69)
+  )
+) {
+  stop(
+    "COVID-excluded cluster q30-70 did not use exactly eight age groups."
+  )
+}
+
+covid_sensitivity <- cluster_q30_70 |>
+  dplyr::select(
+    year,
+    cluster_name,
+    q30_70_observed = q30_70,
+    deaths_age30_69_observed =
+      deaths_age30_69
+  ) |>
+  dplyr::left_join(
+    cluster_q30_70_no_covid |>
+      dplyr::select(
+        year,
+        cluster_name,
+        q30_70_excluding_COVID19,
+        deaths_age30_69_excluding_COVID19
+      ),
+    by = c(
+      "year",
+      "cluster_name"
+    )
+  ) |>
+  dplyr::mutate(
+    absolute_q_difference_due_to_COVID19 =
+      q30_70_observed -
+        q30_70_excluding_COVID19,
+    percentage_point_difference_due_to_COVID19 =
+      100 *
+        absolute_q_difference_due_to_COVID19,
+    relative_fraction_of_observed_q_due_to_COVID19 =
+      safe_ratio(
+        absolute_q_difference_due_to_COVID19,
+        q30_70_observed
+      ),
+    COVID19_deaths_age30_69 =
+      deaths_age30_69_observed -
+        deaths_age30_69_excluding_COVID19
+  ) |>
+  dplyr::arrange(
+    year,
+    cluster_name
+  )
+
+readr::write_csv(
+  covid_sensitivity,
+  file.path(
+    output_dir,
+    "Sensitivity_COVID19_excluded_cluster_q30_70_1990_2023.csv"
+  )
+)
+
+readr::write_csv(
+  covid_sensitivity |>
+    dplyr::filter(
+      year >= 2019L
+    ),
+  file.path(
+    output_dir,
+    "Sensitivity_COVID19_excluded_cluster_q30_70_2019_2023.csv"
+  )
+)
+
+covid_aging_plot_data <- covid_sensitivity |>
+  dplyr::filter(
+    year >= 2019L,
+    cluster_name == "Aging-related"
+  ) |>
+  dplyr::select(
+    year,
+    observed =
+      q30_70_observed,
+    excluding_COVID19 =
+      q30_70_excluding_COVID19
+  ) |>
+  tidyr::pivot_longer(
+    cols = c(
+      observed,
+      excluding_COVID19
+    ),
+    names_to = "scenario",
+    values_to = "q30_70"
+  ) |>
+  dplyr::mutate(
+    scenario = dplyr::recode(
+      scenario,
+      observed = "Observed",
+      excluding_COVID19 =
+        "Excluding COVID-19"
+    )
+  )
+
+p_s_covid <- ggplot2::ggplot(
+  covid_aging_plot_data,
+  ggplot2::aes(
+    x = year,
+    y = q30_70,
+    color = scenario,
+    group = scenario
+  )
+) +
+  ggplot2::geom_line(
+    linewidth = 1.05
+  ) +
+  ggplot2::geom_point(
+    size = 2.4
+  ) +
+  ggplot2::scale_y_continuous(
+    labels =
+      scales::percent_format(
+        accuracy = 0.1
+      )
+  ) +
+  ggplot2::scale_x_continuous(
+    breaks = 2019:2023,
+    minor_breaks = NULL
+  ) +
+  ggplot2::labs(
+    title =
+      "COVID-19 sensitivity analysis for Aging-related premature mortality",
+    subtitle =
+      "China, Both sexes, ages 30–70, 2019–2023",
+    x = NULL,
+    y =
+      "Probability of dying between ages 30 and 70",
+    color = NULL,
+    caption = paste0(
+      "The excluding-COVID-19 series retains the frozen life-course membership ",
+      "and removes only the COVID-19 cause before recalculating q30–70."
+    )
+  ) +
+  ggplot2::theme_bw(
+    base_size = 12.5
+  ) +
+  ggplot2::theme(
+    legend.position = "bottom",
+    panel.grid.minor =
+      ggplot2::element_blank(),
+    plot.title =
+      ggplot2::element_text(
+        face = "bold"
+      )
+  )
+
+save_plot_pair(
+  p_s_covid,
+  "FigureS3_COVID19_sensitivity_aging_cluster_2019_2023",
+  width = 8.5,
+  height = 5.5
+)
+
+
+# ------------------------------------------------------------------------------
+# 10B. Diagnostic for the 2008 Infant-cluster spike
+# ------------------------------------------------------------------------------
+#
+# This diagnostic does not pre-label the cause of the spike. It ranks Infant
+# causes by the change in their own q30-70 and death numbers from 2007 to 2008,
+# while retaining 2009 for context.
+
+infant_cause_2007_2009 <- classified_deaths |>
+  dplyr::filter(
+    cluster_name == "Infant",
+    year %in% 2007:2009
+  ) |>
+  dplyr::group_by(
+    year,
+    cause
+  ) |>
+  dplyr::summarise(
+    n_age_groups =
+      dplyr::n(),
+    cause_q30_70 =
+      q30_70_from_5year_rates(
+        Rate[order(age_index)]
+      ),
+    deaths_age30_69 =
+      sum(Number),
+    .groups = "drop"
+  )
+
+if (
+  any(
+    infant_cause_2007_2009$n_age_groups !=
+      length(age_30_69)
+  )
+) {
+  stop(
+    "Infant 2007-2009 cause diagnostic did not use exactly eight age groups."
+  )
+}
+
+infant_2008_diagnostic <- infant_cause_2007_2009 |>
+  dplyr::select(
+    year,
+    cause,
+    cause_q30_70,
+    deaths_age30_69
+  ) |>
+  tidyr::pivot_wider(
+    names_from = year,
+    values_from = c(
+      cause_q30_70,
+      deaths_age30_69
+    ),
+    names_sep = "_"
+  ) |>
+  dplyr::mutate(
+    q_change_2007_2008 =
+      cause_q30_70_2008 -
+        cause_q30_70_2007,
+    q_change_2008_2009 =
+      cause_q30_70_2009 -
+        cause_q30_70_2008,
+    deaths_change_2007_2008 =
+      deaths_age30_69_2008 -
+        deaths_age30_69_2007,
+    deaths_change_2008_2009 =
+      deaths_age30_69_2009 -
+        deaths_age30_69_2008
+  ) |>
+  dplyr::arrange(
+    dplyr::desc(
+      q_change_2007_2008
+    )
+  )
+
+readr::write_csv(
+  infant_2008_diagnostic,
+  file.path(
+    output_dir,
+    "Diagnostic_Infant_2008_spike_cause_contributors.csv"
+  )
+)
+
+readr::write_csv(
+  infant_2008_diagnostic |>
+    dplyr::slice_head(
+      n = 15
+    ),
+  file.path(
+    output_dir,
+    "Diagnostic_Infant_2008_spike_top15.csv"
   )
 )
 
@@ -1712,7 +2109,7 @@ readr::write_csv(
 
 
 # ------------------------------------------------------------------------------
-# 13. POLICY BRIDGE — formal combined NCD4 q30-70
+# 13. POLICY BRIDGE — GBD 2023-based SDG 3.4.1-equivalent NCD4 q30-70
 # ------------------------------------------------------------------------------
 
 ncd4_deaths <- classified_deaths |>
@@ -1785,7 +2182,7 @@ if (
   )
 ) {
   stop(
-    "Formal NCD4 q30-70 calculation did not use exactly eight age groups."
+    "GBD-based NCD4 q30-70 calculation did not use exactly eight age groups."
   )
 }
 
@@ -1801,7 +2198,7 @@ if (
     )
 ) {
   stop(
-    "Invalid formal NCD4 q30-70 detected."
+    "Invalid GBD-based NCD4 q30-70 detected."
   )
 }
 
@@ -2022,111 +2419,189 @@ readr::write_csv(
 
 
 # ------------------------------------------------------------------------------
-# 16. SDG 3.4 policy anchor: 2015 -> 2023 -> 2030 target
+# 16. Policy anchors — keep GBD-derived and official Chinese targets separate
 # ------------------------------------------------------------------------------
+#
+# GBD 2023-based SDG-equivalent threshold:
+#   The study's NCD4 q30-70 series is reconstructed from GBD 2023 detailed
+#   causes. Applying the SDG 3.4 one-third reduction rule to the GBD 2015 value
+#   yields a MODEL-BASED, SDG-EQUIVALENT threshold for internal scenario work.
+#   It is not labelled as China's official 2030 target value.
+#
+# Official Healthy China benchmark:
+#   Healthy China Action (2019-2030) reports the 30-70 NCD4 premature mortality
+#   probability as 18.5% in 2015 and sets a 2030 target of <=13.0%.
+#   The earlier Healthy China 2030 outline expresses the target as a 30%
+#   reduction versus 2015. These official values are retained as external
+#   policy benchmarks and are not substituted into the GBD-derived time series.
 
-q2015 <- ncd4_q30_70 |>
+q2015_gbd <- ncd4_q30_70 |>
   dplyr::filter(
     year == 2015L
   ) |>
   dplyr::pull(q30_70)
 
-q2023 <- ncd4_q30_70 |>
+q2023_gbd <- ncd4_q30_70 |>
   dplyr::filter(
     year == 2023L
   ) |>
   dplyr::pull(q30_70)
 
 if (
-  length(q2015) != 1L ||
-    length(q2023) != 1L
+  length(q2015_gbd) != 1L ||
+    length(q2023_gbd) != 1L
 ) {
   stop(
-    "Could not uniquely retrieve the 2015 and 2023 formal NCD4 probabilities."
+    "Could not uniquely retrieve the 2015 and 2023 GBD-based NCD4 probabilities."
   )
 }
 
-q2030_sdg_target <- (2 / 3) * q2015
+q2030_gbd_sdg_equivalent_threshold <-
+  (2 / 3) *
+    q2015_gbd
 
-required_absolute_reduction_2015_2030 <-
-  q2015 - q2030_sdg_target
+required_absolute_reduction_2015_2030_gbd <-
+  q2015_gbd -
+    q2030_gbd_sdg_equivalent_threshold
 
-achieved_absolute_reduction_2015_2023 <-
-  q2015 - q2023
+achieved_absolute_reduction_2015_2023_gbd <-
+  q2015_gbd -
+    q2023_gbd
 
-progress_fraction_of_required_reduction <-
+progress_fraction_of_required_reduction_gbd <-
   safe_ratio(
-    achieved_absolute_reduction_2015_2023,
-    required_absolute_reduction_2015_2030
+    achieved_absolute_reduction_2015_2023_gbd,
+    required_absolute_reduction_2015_2030_gbd
   )
 
-target_gap_at_2023 <-
-  q2023 - q2030_sdg_target
+gbd_sdg_equivalent_gap_at_2023 <-
+  q2023_gbd -
+    q2030_gbd_sdg_equivalent_threshold
 
-remaining_relative_reduction_from_2023 <-
-  1 - safe_ratio(
-    q2030_sdg_target,
-    q2023
-  )
+remaining_relative_reduction_from_2023_gbd <-
+  1 -
+    safe_ratio(
+      q2030_gbd_sdg_equivalent_threshold,
+      q2023_gbd
+    )
 
-required_annual_relative_change_2023_2030 <-
+required_annual_relative_change_2023_2030_gbd <-
   (
-    q2030_sdg_target /
-      q2023
+    q2030_gbd_sdg_equivalent_threshold /
+      q2023_gbd
   )^(1 / 7) - 1
 
-sdg_policy_anchor <- tibble::tibble(
-  q30_70_2015 =
-    q2015,
-  q30_70_2023 =
-    q2023,
-  q30_70_2030_SDG_target =
-    q2030_sdg_target,
-  probability_percent_2015 =
-    100 * q2015,
-  probability_percent_2023 =
-    100 * q2023,
-  probability_percent_2030_SDG_target =
-    100 * q2030_sdg_target,
-  relative_change_percent_2015_2023 =
+gbd_sdg_equivalent_policy_anchor <- tibble::tibble(
+  benchmark_system =
+    "GBD 2023-based SDG 3.4.1-equivalent",
+  q30_70_2015_GBD =
+    q2015_gbd,
+  q30_70_2023_GBD =
+    q2023_gbd,
+  q30_70_2030_GBD_SDG_equivalent_threshold =
+    q2030_gbd_sdg_equivalent_threshold,
+  probability_percent_2015_GBD =
+    100 * q2015_gbd,
+  probability_percent_2023_GBD =
+    100 * q2023_gbd,
+  probability_percent_2030_GBD_SDG_equivalent_threshold =
+    100 *
+      q2030_gbd_sdg_equivalent_threshold,
+  relative_change_percent_2015_2023_GBD =
     relative_change_percent(
-      q2015,
-      q2023
+      q2015_gbd,
+      q2023_gbd
     ),
-  required_absolute_reduction_2015_2030 =
-    required_absolute_reduction_2015_2030,
-  achieved_absolute_reduction_2015_2023 =
-    achieved_absolute_reduction_2015_2023,
-  progress_fraction_of_required_reduction =
-    progress_fraction_of_required_reduction,
-  progress_percent_of_required_reduction =
+  required_absolute_reduction_2015_2030_GBD =
+    required_absolute_reduction_2015_2030_gbd,
+  achieved_absolute_reduction_2015_2023_GBD =
+    achieved_absolute_reduction_2015_2023_gbd,
+  progress_fraction_of_required_reduction_GBD =
+    progress_fraction_of_required_reduction_gbd,
+  progress_percent_of_required_reduction_GBD =
     100 *
-      progress_fraction_of_required_reduction,
-  target_gap_at_2023 =
-    target_gap_at_2023,
-  target_gap_percentage_points_at_2023 =
+      progress_fraction_of_required_reduction_gbd,
+  gap_at_2023_to_GBD_SDG_equivalent_threshold =
+    gbd_sdg_equivalent_gap_at_2023,
+  gap_percentage_points_at_2023_to_GBD_SDG_equivalent_threshold =
     100 *
-      target_gap_at_2023,
-  remaining_relative_reduction_from_2023 =
-    remaining_relative_reduction_from_2023,
-  remaining_relative_reduction_percent_from_2023 =
+      gbd_sdg_equivalent_gap_at_2023,
+  remaining_relative_reduction_from_2023_GBD =
+    remaining_relative_reduction_from_2023_gbd,
+  remaining_relative_reduction_percent_from_2023_GBD =
     100 *
-      remaining_relative_reduction_from_2023,
-  required_annual_relative_change_2023_2030 =
-    required_annual_relative_change_2023_2030,
-  required_annual_relative_change_percent_2023_2030 =
+      remaining_relative_reduction_from_2023_gbd,
+  required_annual_relative_change_2023_2030_GBD =
+    required_annual_relative_change_2023_2030_gbd,
+  required_annual_relative_change_percent_2023_2030_GBD =
     100 *
-      required_annual_relative_change_2023_2030
+      required_annual_relative_change_2023_2030_gbd
+)
+
+healthy_china_2015_reference_probability <-
+  0.185
+
+healthy_china_2030_official_threshold <-
+  0.130
+
+policy_benchmarks <- tibble::tibble(
+  benchmark =
+    c(
+      "GBD 2023-based SDG 3.4.1-equivalent",
+      "Healthy China Action 2019-2030 official benchmark"
+    ),
+  data_system =
+    c(
+      "GBD 2023 reconstructed NCD4 series",
+      "Official Chinese policy benchmark / national mortality surveillance"
+    ),
+  baseline_year =
+    c(
+      2015L,
+      2015L
+    ),
+  baseline_probability =
+    c(
+      q2015_gbd,
+      healthy_china_2015_reference_probability
+    ),
+  target_year =
+    c(
+      2030L,
+      2030L
+    ),
+  target_probability =
+    c(
+      q2030_gbd_sdg_equivalent_threshold,
+      healthy_china_2030_official_threshold
+    ),
+  target_rule =
+    c(
+      "One-third reduction from the GBD 2023-based 2015 value",
+      "Official target <=13.0%; policy document reports 18.5% in 2015"
+    ),
+  use_in_this_study =
+    c(
+      "Internal model-based SDG-equivalent threshold for projection and scenario gap calculations",
+      "External policy benchmark; do not substitute into the GBD time series"
+    )
 )
 
 readr::write_csv(
-  sdg_policy_anchor,
+  gbd_sdg_equivalent_policy_anchor,
   file.path(
     output_dir,
-    "NCD4_SDG34_policy_anchor_2015_2023_2030target.csv"
+    "NCD4_GBD2023_SDG_equivalent_policy_anchor.csv"
   )
 )
 
+readr::write_csv(
+  policy_benchmarks,
+  file.path(
+    output_dir,
+    "NCD4_policy_benchmarks_GBD_vs_HealthyChina.csv"
+  )
+)
 
 # ------------------------------------------------------------------------------
 # 17. Compact analysis audit and reproducibility bundle
@@ -2149,7 +2624,7 @@ analysis_audit <- tibble::tibble(
     "Chronic_respiratory_causes",
     "Diabetes_causes",
     "cluster_q30_70_age_groups_per_estimate",
-    "formal_NCD4_q30_70_age_groups_per_estimate"
+    "GBD_based_NCD4_q30_70_age_groups_per_estimate"
   ),
   value = c(
     paste(input_files, collapse = " | "),
@@ -2210,8 +2685,10 @@ saveRDS(
       cluster_order = cluster_order,
       mapping_version =
         ncd4_mapping_version,
-      sdg_target_rule =
-        "2030 target = two-thirds of 2015 NCD4 q30-70"
+      sdg_equivalent_threshold_rule =
+        "GBD 2023-based 2030 SDG-equivalent threshold = two-thirds of GBD 2015 NCD4 q30-70",
+      healthy_china_official_benchmark =
+        "Healthy China Action 2019-2030: 2015 = 18.5%; 2030 <= 13.0%; retained separately"
     ),
     batch_periods = batch_periods,
     cluster_membership =
@@ -2232,8 +2709,14 @@ saveRDS(
       ncd4_component_q30_70,
     ncd4_cluster_linkage =
       ncd4_cluster_linkage,
-    sdg_policy_anchor =
-      sdg_policy_anchor,
+    gbd_sdg_equivalent_policy_anchor =
+      gbd_sdg_equivalent_policy_anchor,
+    policy_benchmarks =
+      policy_benchmarks,
+    covid_sensitivity =
+      covid_sensitivity,
+    infant_2008_diagnostic =
+      infant_2008_diagnostic,
     closure_by_year_age =
       closure_by_year_age
   ),
@@ -2278,9 +2761,44 @@ print(
     )
 )
 
-cat("\nFormal NCD4 policy anchor:\n")
+cat("\nGBD 2023-based SDG-equivalent NCD4 policy anchor:\n")
 print(
-  sdg_policy_anchor
+  gbd_sdg_equivalent_policy_anchor
+)
+
+cat("\nOfficial Healthy China benchmark kept separate:\n")
+print(
+  policy_benchmarks
+)
+
+cat("\nCOVID-19 sensitivity for Aging-related cluster, 2020-2023:\n")
+print(
+  covid_sensitivity |>
+    dplyr::filter(
+      year >= 2020L,
+      cluster_name == "Aging-related"
+    ) |>
+    dplyr::select(
+      year,
+      q30_70_observed,
+      q30_70_excluding_COVID19,
+      percentage_point_difference_due_to_COVID19,
+      COVID19_deaths_age30_69
+    )
+)
+
+cat("\nTop diagnostic contributors to the 2008 Infant-cluster spike:\n")
+print(
+  infant_2008_diagnostic |>
+    dplyr::slice_head(
+      n = 10
+    ) |>
+    dplyr::select(
+      cause,
+      q_change_2007_2008,
+      deaths_change_2007_2008,
+      q_change_2008_2009
+    )
 )
 
 cat("\nNCD4 x life-course cluster linkage in 2023:\n")
