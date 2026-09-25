@@ -22,10 +22,13 @@
 #      which phenotype carries NCD4 mortality.
 #
 #   D. POLICY ANCHOR:
-#      Calculate the GBD 2023-based 2015 NCD4 baseline, 2023 observed value and
-#      an SDG-equivalent 2030 threshold (= two-thirds of the GBD 2015 value).
-#      Keep the official Healthy China benchmark (18.5% in 2015; <=13.0% in
-#      2030) separate rather than mixing the two estimation systems.
+#      Use the Healthy China 2030 target as the primary China-specific policy
+#      benchmark. For internal GBD-consistent target-gap calculations, apply
+#      the Healthy China relative target (30% reduction from 2015) to the GBD
+#      2023-based 2015 NCD4 probability. Keep the official national benchmark
+#      (2015 = 18.5%; 2030 <= 13.0%) as an external surveillance-based reference.
+#      The UN SDG 3.4 one-third reduction is retained only as a secondary
+#      international sensitivity benchmark.
 #
 # IMPORTANT INTERPRETATION
 #   - The three cluster-specific probabilities are cause-group NET probabilities
@@ -2357,21 +2360,29 @@ readr::write_csv(
 
 
 # ------------------------------------------------------------------------------
-# 16. Policy anchors — keep GBD-derived and official Chinese targets separate
+# 16. Policy anchors — Healthy China primary, SDG secondary
 # ------------------------------------------------------------------------------
 #
-# GBD 2023-based SDG-equivalent threshold:
-#   The study's NCD4 q30-70 series is reconstructed from GBD 2023 detailed
-#   causes. Applying the SDG 3.4 one-third reduction rule to the GBD 2015 value
-#   yields a MODEL-BASED, SDG-EQUIVALENT threshold for internal scenario work.
-#   It is not labelled as China's official 2030 target value.
+# PRIMARY CHINA-SPECIFIC TARGET
+#   Healthy China 2030 sets a 30% reduction in major chronic-disease premature
+#   mortality from the 2015 baseline. Healthy China Action (2019-2030)
+#   operationalises the indicator as the probability of dying between ages
+#   30 and 70 from CVD, cancer, chronic respiratory diseases and diabetes,
+#   reporting 18.5% in 2015 and a 2030 target of <=13.0%.
 #
-# Official Healthy China benchmark:
-#   Healthy China Action (2019-2030) reports the 30-70 NCD4 premature mortality
-#   probability as 18.5% in 2015 and sets a 2030 target of <=13.0%.
-#   The earlier Healthy China 2030 outline expresses the target as a 30%
-#   reduction versus 2015. These official values are retained as external
-#   policy benchmarks and are not substituted into the GBD-derived time series.
+#   Because this study reconstructs the indicator from GBD 2023 rather than the
+#   national death-surveillance system, the primary within-study target used for
+#   target-gap calculations is a GBD-HARMONISED HEALTHY CHINA TARGET:
+#
+#       q2030_target_GBD_HC = 0.70 * q2015_GBD
+#
+#   The official <=13.0% value is retained as an external policy benchmark and
+#   is not substituted into the GBD-derived time series.
+#
+# SECONDARY INTERNATIONAL BENCHMARK
+#   UN SDG 3.4 calls for a one-third reduction from 2015. The corresponding
+#   GBD-based threshold (2/3 * q2015_GBD) is retained only as a sensitivity /
+#   international-comparison benchmark, not as the primary China target.
 
 q2015_gbd <- ncd4_q30_70 |>
   dplyr::filter(
@@ -2394,142 +2405,163 @@ if (
   )
 }
 
-q2030_gbd_sdg_equivalent_threshold <-
-  (2 / 3) *
-    q2015_gbd
+# Primary GBD-harmonised Healthy China target: 30% reduction from 2015.
+q2030_gbd_healthy_china_target <-
+  0.70 * q2015_gbd
 
-required_absolute_reduction_2015_2030_gbd <-
+required_absolute_reduction_2015_2030_gbd_hc <-
   q2015_gbd -
-    q2030_gbd_sdg_equivalent_threshold
+    q2030_gbd_healthy_china_target
 
 achieved_absolute_reduction_2015_2023_gbd <-
   q2015_gbd -
     q2023_gbd
 
-progress_fraction_of_required_reduction_gbd <-
+progress_fraction_of_required_reduction_gbd_hc <-
   safe_ratio(
     achieved_absolute_reduction_2015_2023_gbd,
-    required_absolute_reduction_2015_2030_gbd
+    required_absolute_reduction_2015_2030_gbd_hc
   )
 
-gbd_sdg_equivalent_gap_at_2023 <-
+gbd_healthy_china_gap_at_2023 <-
   q2023_gbd -
-    q2030_gbd_sdg_equivalent_threshold
+    q2030_gbd_healthy_china_target
 
-remaining_relative_reduction_from_2023_gbd <-
+remaining_relative_reduction_from_2023_gbd_hc <-
   1 -
     safe_ratio(
-      q2030_gbd_sdg_equivalent_threshold,
+      q2030_gbd_healthy_china_target,
       q2023_gbd
     )
 
-required_annual_relative_change_2023_2030_gbd <-
+required_annual_relative_change_2023_2030_gbd_hc <-
   (
-    q2030_gbd_sdg_equivalent_threshold /
+    q2030_gbd_healthy_china_target /
       q2023_gbd
   )^(1 / 7) - 1
 
-gbd_sdg_equivalent_policy_anchor <- tibble::tibble(
+gbd_healthy_china_policy_anchor <- tibble::tibble(
   benchmark_system =
-    "GBD 2023-based SDG 3.4.1-equivalent",
+    "GBD 2023-harmonised Healthy China 2030",
+  target_definition =
+    "30% reduction from the GBD 2023-based 2015 NCD4 q30-70",
   q30_70_2015_GBD =
     q2015_gbd,
   q30_70_2023_GBD =
     q2023_gbd,
-  q30_70_2030_GBD_SDG_equivalent_threshold =
-    q2030_gbd_sdg_equivalent_threshold,
+  q30_70_2030_GBD_HealthyChina_target =
+    q2030_gbd_healthy_china_target,
   probability_percent_2015_GBD =
     100 * q2015_gbd,
   probability_percent_2023_GBD =
     100 * q2023_gbd,
-  probability_percent_2030_GBD_SDG_equivalent_threshold =
-    100 *
-      q2030_gbd_sdg_equivalent_threshold,
+  probability_percent_2030_GBD_HealthyChina_target =
+    100 * q2030_gbd_healthy_china_target,
   relative_change_percent_2015_2023_GBD =
     relative_change_percent(
       q2015_gbd,
       q2023_gbd
     ),
-  required_absolute_reduction_2015_2030_GBD =
-    required_absolute_reduction_2015_2030_gbd,
+  required_absolute_reduction_2015_2030_GBD_HC =
+    required_absolute_reduction_2015_2030_gbd_hc,
   achieved_absolute_reduction_2015_2023_GBD =
     achieved_absolute_reduction_2015_2023_gbd,
-  progress_fraction_of_required_reduction_GBD =
-    progress_fraction_of_required_reduction_gbd,
-  progress_percent_of_required_reduction_GBD =
+  progress_fraction_of_required_reduction_GBD_HC =
+    progress_fraction_of_required_reduction_gbd_hc,
+  progress_percent_of_required_reduction_GBD_HC =
     100 *
-      progress_fraction_of_required_reduction_gbd,
-  gap_at_2023_to_GBD_SDG_equivalent_threshold =
-    gbd_sdg_equivalent_gap_at_2023,
-  gap_percentage_points_at_2023_to_GBD_SDG_equivalent_threshold =
+      progress_fraction_of_required_reduction_gbd_hc,
+  gap_at_2023_to_GBD_HealthyChina_target =
+    gbd_healthy_china_gap_at_2023,
+  gap_percentage_points_at_2023_to_GBD_HealthyChina_target =
     100 *
-      gbd_sdg_equivalent_gap_at_2023,
-  remaining_relative_reduction_from_2023_GBD =
-    remaining_relative_reduction_from_2023_gbd,
-  remaining_relative_reduction_percent_from_2023_GBD =
+      gbd_healthy_china_gap_at_2023,
+  remaining_relative_reduction_from_2023_GBD_HC =
+    remaining_relative_reduction_from_2023_gbd_hc,
+  remaining_relative_reduction_percent_from_2023_GBD_HC =
     100 *
-      remaining_relative_reduction_from_2023_gbd,
-  required_annual_relative_change_2023_2030_GBD =
-    required_annual_relative_change_2023_2030_gbd,
-  required_annual_relative_change_percent_2023_2030_GBD =
+      remaining_relative_reduction_from_2023_gbd_hc,
+  required_annual_relative_change_2023_2030_GBD_HC =
+    required_annual_relative_change_2023_2030_gbd_hc,
+  required_annual_relative_change_percent_2023_2030_GBD_HC =
     100 *
-      required_annual_relative_change_2023_2030_gbd
+      required_annual_relative_change_2023_2030_gbd_hc
 )
 
+# Official Healthy China Action surveillance-based benchmark.
 healthy_china_2015_reference_probability <-
   0.185
 
 healthy_china_2030_official_threshold <-
   0.130
 
+# Secondary UN SDG 3.4 benchmark: one-third reduction from 2015.
+q2030_gbd_sdg_equivalent_threshold <-
+  (2 / 3) *
+    q2015_gbd
+
 policy_benchmarks <- tibble::tibble(
   benchmark =
     c(
-      "GBD 2023-based SDG 3.4.1-equivalent",
-      "Healthy China Action 2019-2030 official benchmark"
+      "GBD 2023-harmonised Healthy China 2030 target",
+      "Healthy China Action 2019-2030 official benchmark",
+      "GBD 2023-based UN SDG 3.4 equivalent threshold"
+    ),
+  role_in_analysis =
+    c(
+      "PRIMARY target-gap benchmark",
+      "External official policy benchmark",
+      "Secondary international sensitivity benchmark"
     ),
   data_system =
     c(
       "GBD 2023 reconstructed NCD4 series",
-      "Official Chinese policy benchmark / national mortality surveillance"
+      "National policy / death-surveillance system",
+      "GBD 2023 reconstructed NCD4 series"
     ),
   baseline_year =
     c(
+      2015L,
       2015L,
       2015L
     ),
   baseline_probability =
     c(
       q2015_gbd,
-      healthy_china_2015_reference_probability
+      healthy_china_2015_reference_probability,
+      q2015_gbd
     ),
   target_year =
     c(
+      2030L,
       2030L,
       2030L
     ),
   target_probability =
     c(
-      q2030_gbd_sdg_equivalent_threshold,
-      healthy_china_2030_official_threshold
+      q2030_gbd_healthy_china_target,
+      healthy_china_2030_official_threshold,
+      q2030_gbd_sdg_equivalent_threshold
     ),
   target_rule =
     c(
-      "One-third reduction from the GBD 2023-based 2015 value",
-      "Official target <=13.0%; policy document reports 18.5% in 2015"
+      "30% reduction from the GBD 2023-based 2015 value",
+      "Official target <=13.0%; official 2015 reference = 18.5%",
+      "One-third reduction from the GBD 2023-based 2015 value"
     ),
-  use_in_this_study =
+  interpretation =
     c(
-      "Internal model-based SDG-equivalent threshold for projection and scenario gap calculations",
-      "External policy benchmark; do not substitute into the GBD time series"
+      "Use for primary BAU target-gap and intervention-gap-closure calculations",
+      "Report as official Chinese policy threshold; do not mix its baseline with GBD estimates",
+      "Use only for SDG sensitivity / international comparison"
     )
 )
 
 readr::write_csv(
-  gbd_sdg_equivalent_policy_anchor,
+  gbd_healthy_china_policy_anchor,
   file.path(
     output_dir,
-    "NCD4_GBD2023_SDG_equivalent_policy_anchor.csv"
+    "NCD4_GBD2023_HealthyChina_harmonised_policy_anchor.csv"
   )
 )
 
@@ -2537,7 +2569,7 @@ readr::write_csv(
   policy_benchmarks,
   file.path(
     output_dir,
-    "NCD4_policy_benchmarks_GBD_vs_HealthyChina.csv"
+    "NCD4_policy_benchmarks_HealthyChina_and_SDG.csv"
   )
 )
 
@@ -2623,10 +2655,12 @@ saveRDS(
       cluster_order = cluster_order,
       mapping_version =
         ncd4_mapping_version,
-      sdg_equivalent_threshold_rule =
-        "GBD 2023-based 2030 SDG-equivalent threshold = two-thirds of GBD 2015 NCD4 q30-70",
+      primary_target_rule =
+        "GBD-harmonised Healthy China 2030 target = 30% reduction from GBD 2015 NCD4 q30-70",
       healthy_china_official_benchmark =
-        "Healthy China Action 2019-2030: 2015 = 18.5%; 2030 <= 13.0%; retained separately"
+        "Healthy China Action 2019-2030: 2015 = 18.5%; 2030 <= 13.0%; external surveillance-based benchmark",
+      secondary_sdg_rule =
+        "UN SDG 3.4 sensitivity benchmark = one-third reduction from GBD 2015 NCD4 q30-70"
     ),
     batch_periods = batch_periods,
     cluster_membership =
@@ -2647,8 +2681,8 @@ saveRDS(
       ncd4_component_q30_70,
     ncd4_cluster_linkage =
       ncd4_cluster_linkage,
-    gbd_sdg_equivalent_policy_anchor =
-      gbd_sdg_equivalent_policy_anchor,
+    gbd_healthy_china_policy_anchor =
+      gbd_healthy_china_policy_anchor,
     policy_benchmarks =
       policy_benchmarks,
     covid_sensitivity =
@@ -2699,12 +2733,12 @@ print(
     )
 )
 
-cat("\nGBD 2023-based SDG-equivalent NCD4 policy anchor:\n")
+cat("\nPrimary GBD-harmonised Healthy China NCD4 policy anchor:\n")
 print(
-  gbd_sdg_equivalent_policy_anchor
+  gbd_healthy_china_policy_anchor
 )
 
-cat("\nOfficial Healthy China benchmark kept separate:\n")
+cat("\nPolicy benchmarks: Healthy China primary / official benchmark / SDG sensitivity:\n")
 print(
   policy_benchmarks
 )
