@@ -13,18 +13,25 @@ DALYs at ages 30–69 and its fraction of the Stage 2 cluster DALY baseline.
 Each risk is a separate TMREL counterfactual. Results for different risks are
 not additive because GBD risks overlap and may mediate one another.
 
-## Run
+## Primary R implementation
 
 ```powershell
-python .\Step4_RiskCounterfactual\step4_risk_counterfactual.py `
+Rscript .\Step4_RiskCounterfactual\Step4_RiskCounterfactual.R `
   --risk-csv .\IHME-GBD_2023_risk.csv `
   --membership-csv .\Part3_PrematureMortality_outputs\Part3_frozen_cluster_membership_used.csv `
   --mortality-csv .\Part3_PrematureMortality_outputs\Part3_cluster_age_specific_mortality_1990_2023.csv `
   --daly-baseline-csv .\Stage2_Redesigned_30_69_outputs\Stage2_core_DALY_summary.csv `
-  --output-dir .\outputs\Step4_RiskCounterfactual
+  --output-dir .\Step4_RiskCounterfactual_outputs
 ```
 
-No third-party Python packages are required.
+The R script uses base R only. It writes CSV outputs, an RDS analysis bundle,
+`sessionInfo()`, a manifest, and a human-readable results report.
+
+## Companion Python cross-check
+
+`step4_risk_counterfactual.py` implements the same estimands and QC rules using
+the Python standard library. It is retained for independent cross-checking; the
+R script is the primary analysis implementation.
 
 ## Important QC choices
 
@@ -46,6 +53,7 @@ No third-party Python packages are required.
 ## Outputs
 
 - `Step4_input_QC.csv`
+- `Step4_number_rate_population_QC.csv`
 - `Step4_risk_cause_cluster_mapping.csv`
 - `Step4_baseline_cluster_2023.csv`
 - `Step4_risk_cluster_age_aggregates.csv`
@@ -53,5 +61,7 @@ No third-party Python packages are required.
 - `Step4_DALY_counterfactuals.csv`
 - `Step4_risk_cluster_summary.csv`
 - `Step4_key_results.md`
-- `Step4_manifest.json`
+- `Step4_manifest.txt`
+- `Step4_RiskCounterfactual_analysis_objects.rds`
+- `Step4_sessionInfo.txt`
 

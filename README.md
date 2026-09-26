@@ -149,6 +149,10 @@ The older `Part3_1990_2023_trends.R` remains in the repository as a legacy/suppl
 
 Primary script:
 
+`Step4_RiskCounterfactual/Step4_RiskCounterfactual.R`
+
+Companion cross-check implementation:
+
 `Step4_RiskCounterfactual/step4_risk_counterfactual.py`
 
 Step 4 preserves the frozen 292-cause life-course membership and links the
@@ -183,7 +187,7 @@ uncertainty propagation requires draw-level covariance.
 - `Stage2_core_DALY_summary.csv`.
 
 See `Step4_RiskCounterfactual/README.md` for the command and output dictionary.
-No third-party Python package is required.
+The primary R analysis uses base R only; no third-party R package is required.
 
 ### Non-additivity rule
 
