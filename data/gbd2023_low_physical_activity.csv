@@ -1,0 +1,73 @@
+population_group,measure,location,sex,age,cause,rei,metric,year,val,upper,lower
+All Population,Deaths,China,Male,All ages,Diabetes mellitus type 2,Low physical activity,Number,1990,1545.0803484876892,2735.4640454362925,529.6071064852135
+All Population,Deaths,China,Female,All ages,Diabetes mellitus type 2,Low physical activity,Number,1990,4090.6225543053924,7875.1801862026505,1608.5975315751255
+All Population,Deaths,China,Both,All ages,Diabetes mellitus type 2,Low physical activity,Number,1990,5635.702902793083,9904.06824411527,2213.6557676873235
+All Population,Deaths,China,Male,All ages,Diabetes mellitus type 2,Low physical activity,Number,2023,6814.903040820555,12495.210337574816,2747.873251607148
+All Population,Deaths,China,Female,All ages,Diabetes mellitus type 2,Low physical activity,Number,2023,10106.68175654961,17143.310748156124,4201.963136625291
+All Population,Deaths,China,Both,All ages,Diabetes mellitus type 2,Low physical activity,Number,2023,16921.584797370182,27980.9035649796,7079.974938428319
+All Population,Deaths,China,Male,All ages,Ischemic stroke,Low physical activity,Number,1990,12405.799396593191,23433.506203806028,2278.1859767471014
+All Population,Deaths,China,Female,All ages,Ischemic stroke,Low physical activity,Number,1990,15341.680325615713,32118.711737365255,1708.814007028463
+All Population,Deaths,China,Both,All ages,Ischemic stroke,Low physical activity,Number,1990,27747.479722208936,52895.583860274826,5296.907962746428
+All Population,Deaths,China,Male,All ages,Ischemic stroke,Low physical activity,Number,2023,16908.222206225575,38158.647902025,-3769.3229097344292
+All Population,Deaths,China,Female,All ages,Ischemic stroke,Low physical activity,Number,2023,15869.196217477729,43204.59445938304,-7141.141103450194
+All Population,Deaths,China,Both,All ages,Ischemic stroke,Low physical activity,Number,2023,32777.41842370331,79857.11173760827,-9391.18086195955
+All Population,Deaths,China,Male,All ages,Ischemic heart disease,Low physical activity,Number,1990,4876.482796963528,9039.947774493636,1882.2996116513734
+All Population,Deaths,China,Female,All ages,Ischemic heart disease,Low physical activity,Number,1990,11971.089500811973,20992.66745477175,4642.479744276274
+All Population,Deaths,China,Both,All ages,Ischemic heart disease,Low physical activity,Number,1990,16847.572297775507,28934.527545470217,7028.612799205263
+All Population,Deaths,China,Male,All ages,Ischemic heart disease,Low physical activity,Number,2023,19688.519120609544,40563.96852641232,6836.188864595257
+All Population,Deaths,China,Female,All ages,Ischemic heart disease,Low physical activity,Number,2023,40651.044244746074,84294.035797921,15920.764980852116
+All Population,Deaths,China,Both,All ages,Ischemic heart disease,Low physical activity,Number,2023,60339.563365355614,108575.18141124699,24501.60551979402
+All Population,DALYs (Disability-Adjusted Life Years),China,Male,All ages,Diabetes mellitus type 2,Low physical activity,Number,1990,81821.98643154328,144572.98461864464,28013.28623259725
+All Population,DALYs (Disability-Adjusted Life Years),China,Female,All ages,Diabetes mellitus type 2,Low physical activity,Number,1990,170891.79172266892,301406.80037242605,73864.08050421915
+All Population,DALYs (Disability-Adjusted Life Years),China,Both,All ages,Diabetes mellitus type 2,Low physical activity,Number,1990,252713.7781542123,435163.05990387197,101340.11656158286
+All Population,DALYs (Disability-Adjusted Life Years),China,Male,All ages,Ischemic stroke,Low physical activity,Number,2023,432591.438280297,821349.003714791,103123.61298086698
+All Population,DALYs (Disability-Adjusted Life Years),China,Female,All ages,Ischemic stroke,Low physical activity,Number,2023,402087.4885553818,814438.5363561077,22906.070265851948
+All Population,DALYs (Disability-Adjusted Life Years),China,Both,All ages,Ischemic stroke,Low physical activity,Number,2023,834678.9268356788,1658143.3644949023,166015.9765186894
+All Population,DALYs (Disability-Adjusted Life Years),China,Male,All ages,Ischemic stroke,Low physical activity,Number,1990,314779.6782360415,548235.9876704068,100654.32838439109
+All Population,DALYs (Disability-Adjusted Life Years),China,Female,All ages,Ischemic stroke,Low physical activity,Number,1990,378311.2511226997,680466.7147042784,132147.37618300575
+All Population,DALYs (Disability-Adjusted Life Years),China,Both,All ages,Ischemic stroke,Low physical activity,Number,1990,693090.9293587412,1188791.0658106138,238737.22616272935
+All Population,DALYs (Disability-Adjusted Life Years),China,Male,All ages,Ischemic heart disease,Low physical activity,Number,2023,306644.97201235895,571043.7421504008,118078.34704149116
+All Population,DALYs (Disability-Adjusted Life Years),China,Female,All ages,Ischemic heart disease,Low physical activity,Number,2023,570312.1531174273,1065289.0671190133,239169.82214625867
+All Population,DALYs (Disability-Adjusted Life Years),China,Both,All ages,Ischemic heart disease,Low physical activity,Number,2023,876957.1251297855,1495400.3377459948,381928.24740869936
+All Population,DALYs (Disability-Adjusted Life Years),China,Male,All ages,Diabetes mellitus type 2,Low physical activity,Number,2023,287599.62753795896,501244.78624907765,111856.64394161082
+All Population,DALYs (Disability-Adjusted Life Years),China,Female,All ages,Diabetes mellitus type 2,Low physical activity,Number,2023,449911.97404176724,725455.3279682496,188156.44985930822
+All Population,DALYs (Disability-Adjusted Life Years),China,Both,All ages,Diabetes mellitus type 2,Low physical activity,Number,2023,737511.6015797262,1211536.0474096094,310578.13063695066
+All Population,DALYs (Disability-Adjusted Life Years),China,Male,All ages,Ischemic heart disease,Low physical activity,Number,1990,99950.69522028035,181947.2523063466,38731.58693929807
+All Population,DALYs (Disability-Adjusted Life Years),China,Female,All ages,Ischemic heart disease,Low physical activity,Number,1990,220802.01069465763,369507.0096686308,87718.32282139981
+All Population,DALYs (Disability-Adjusted Life Years),China,Both,All ages,Ischemic heart disease,Low physical activity,Number,1990,320752.7059149381,509404.3474149233,136111.37626074327
+All Population,YLDs (Years Lived with Disability),China,Male,All ages,Ischemic stroke,Low physical activity,Number,1990,28135.71856869839,52174.7516164782,10759.056349128361
+All Population,YLDs (Years Lived with Disability),China,Female,All ages,Ischemic stroke,Low physical activity,Number,1990,44453.61591014359,79809.77351700944,16996.904221767356
+All Population,YLDs (Years Lived with Disability),China,Both,All ages,Ischemic stroke,Low physical activity,Number,1990,72589.33447884195,126210.7767817459,27778.061093039905
+All Population,YLDs (Years Lived with Disability),China,Male,All ages,Ischemic heart disease,Low physical activity,Number,2023,17803.663094467604,38660.741845908604,6120.249067257532
+All Population,YLDs (Years Lived with Disability),China,Female,All ages,Ischemic heart disease,Low physical activity,Number,2023,39932.84746076879,70145.63666360611,14895.243779569653
+All Population,YLDs (Years Lived with Disability),China,Both,All ages,Ischemic heart disease,Low physical activity,Number,2023,57736.510555236426,101015.70471913645,21877.534577630264
+All Population,YLDs (Years Lived with Disability),China,Male,All ages,Ischemic heart disease,Low physical activity,Number,1990,4645.793186414258,9592.330537890162,1523.7418276579092
+All Population,YLDs (Years Lived with Disability),China,Female,All ages,Ischemic heart disease,Low physical activity,Number,1990,10237.882689955659,18453.36542196722,4290.458721835275
+All Population,YLDs (Years Lived with Disability),China,Both,All ages,Ischemic heart disease,Low physical activity,Number,1990,14883.675876369918,26398.99047370514,5867.499854729671
+All Population,YLDs (Years Lived with Disability),China,Male,All ages,Ischemic stroke,Low physical activity,Number,2023,91993.50961871521,181406.9037099138,29415.07400964674
+All Population,YLDs (Years Lived with Disability),China,Female,All ages,Ischemic stroke,Low physical activity,Number,2023,116568.09749083892,213769.11145476426,39550.571556447794
+All Population,YLDs (Years Lived with Disability),China,Both,All ages,Ischemic stroke,Low physical activity,Number,2023,208561.60710955434,376306.1989015314,65375.816108796054
+All Population,YLDs (Years Lived with Disability),China,Male,All ages,Diabetes mellitus type 2,Low physical activity,Number,2023,170175.19028497496,318302.722003935,63976.305799194175
+All Population,YLDs (Years Lived with Disability),China,Female,All ages,Diabetes mellitus type 2,Low physical activity,Number,2023,276768.1874103326,475474.028746499,110985.81452125446
+All Population,YLDs (Years Lived with Disability),China,Both,All ages,Diabetes mellitus type 2,Low physical activity,Number,2023,446943.3776953073,790491.8493666878,178978.92278220187
+All Population,YLDs (Years Lived with Disability),China,Male,All ages,Diabetes mellitus type 2,Low physical activity,Number,1990,48523.48225976814,90129.90431810232,17589.406444233846
+All Population,YLDs (Years Lived with Disability),China,Female,All ages,Diabetes mellitus type 2,Low physical activity,Number,1990,86142.98018572108,143757.91872157948,32248.12625386331
+All Population,YLDs (Years Lived with Disability),China,Both,All ages,Diabetes mellitus type 2,Low physical activity,Number,1990,134666.46244548922,231344.50849540945,49669.75891119639
+All Population,YLLs (Years of Life Lost),China,Male,All ages,Diabetes mellitus type 2,Low physical activity,Number,1990,33298.50417177514,61402.13075123571,11337.99313389048
+All Population,YLLs (Years of Life Lost),China,Female,All ages,Diabetes mellitus type 2,Low physical activity,Number,1990,84748.81153694785,164777.9171221795,32198.227826560556
+All Population,YLLs (Years of Life Lost),China,Both,All ages,Diabetes mellitus type 2,Low physical activity,Number,1990,118047.31570872296,211102.18832328805,45692.353013429776
+All Population,YLLs (Years of Life Lost),China,Male,All ages,Ischemic heart disease,Low physical activity,Number,2023,288841.3089178913,534364.8140310276,111195.4447239879
+All Population,YLLs (Years of Life Lost),China,Female,All ages,Ischemic heart disease,Low physical activity,Number,2023,530379.3056566584,1004047.5775325124,216342.12408494862
+All Population,YLLs (Years of Life Lost),China,Both,All ages,Ischemic heart disease,Low physical activity,Number,2023,819220.6145745496,1399831.8070207785,353103.419022594
+All Population,YLLs (Years of Life Lost),China,Male,All ages,Diabetes mellitus type 2,Low physical activity,Number,2023,117424.43725298384,218996.84280571257,44294.00566724821
+All Population,YLLs (Years of Life Lost),China,Female,All ages,Diabetes mellitus type 2,Low physical activity,Number,2023,173143.7866314343,288277.5904448188,72410.11250008398
+All Population,YLLs (Years of Life Lost),China,Both,All ages,Diabetes mellitus type 2,Low physical activity,Number,2023,290568.22388441826,474366.5376276975,117485.1943126574
+All Population,YLLs (Years of Life Lost),China,Male,All ages,Ischemic stroke,Low physical activity,Number,1990,286643.9596673427,504289.5737333298,89177.07713778125
+All Population,YLLs (Years of Life Lost),China,Female,All ages,Ischemic stroke,Low physical activity,Number,1990,333857.6352125561,624270.0878662146,105647.3509056263
+All Population,YLLs (Years of Life Lost),China,Both,All ages,Ischemic stroke,Low physical activity,Number,1990,620501.5948798994,1069633.153609291,208551.02393842716
+All Population,YLLs (Years of Life Lost),China,Male,All ages,Ischemic stroke,Low physical activity,Number,2023,340597.9286615819,650588.6874629648,71859.16410801456
+All Population,YLLs (Years of Life Lost),China,Female,All ages,Ischemic stroke,Low physical activity,Number,2023,285519.3910645431,615879.6567768218,-19754.021045654594
+All Population,YLLs (Years of Life Lost),China,Both,All ages,Ischemic stroke,Low physical activity,Number,2023,626117.3197261245,1276898.2331930627,70257.27081043558
+All Population,YLLs (Years of Life Lost),China,Male,All ages,Ischemic heart disease,Low physical activity,Number,1990,95304.90203386606,174249.15220713514,36403.64994796397
+All Population,YLLs (Years of Life Lost),China,Female,All ages,Ischemic heart disease,Low physical activity,Number,1990,210564.12800470207,355074.8687055597,82997.73839749227
+All Population,YLLs (Years of Life Lost),China,Both,All ages,Ischemic heart disease,Low physical activity,Number,1990,305869.03003856825,491185.3343312629,127366.47262391262
