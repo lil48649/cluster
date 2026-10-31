@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#10243c">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://*.supabase.co; object-src 'none'; base-uri 'self'; form-action 'self'">
   <meta name="referrer" content="strict-origin-when-cross-origin">
   <meta name="description" content="GBD 2023中国低体力活动归因疾病负担：科研数据查询与管理平台">
   <title>GBD Research Hub · 科研数据管理系统</title>
@@ -23,23 +23,23 @@
       <div class="login-form-eyebrow">WELCOME BACK</div><h2>登录管理平台</h2><p class="login-subtitle">请使用项目组账号登录科研数据管理系统</p>
       <form id="loginForm" autocomplete="on" novalidate>
         <label for="loginRole">登录角色</label><div class="login-field"><span class="field-prefix">▦</span><select id="loginRole" name="role" required><option value="" selected disabled>请选择登录角色</option><option value="project">项目组</option></select></div>
-        <label for="loginUsername">登录账号</label><div class="login-field"><span class="field-prefix">♙</span><input type="text" id="loginUsername" name="username" autocomplete="username" spellcheck="false" placeholder="请输入账号" required maxlength="80"></div>
-        <label for="loginPassword">登录密码</label><div class="login-field"><span class="field-prefix">◇</span><input type="password" id="loginPassword" name="password" autocomplete="current-password" placeholder="请输入密码" required><button id="togglePassword" class="login-eye" type="button" aria-label="显示密码" aria-pressed="false">显示</button></div>
+        <label for="loginUsername">项目组成员邮箱</label><div class="login-field"><span class="field-prefix">♙</span><input type="email" id="loginUsername" name="email" autocomplete="email" spellcheck="false" placeholder="请输入已授权邮箱" required maxlength="150"></div>
+        <label for="loginPassword">个人登录密码</label><div class="login-field"><span class="field-prefix">◇</span><input type="password" id="loginPassword" name="password" autocomplete="current-password" placeholder="请输入密码" required><button id="togglePassword" class="login-eye" type="button" aria-label="显示密码" aria-pressed="false">显示</button></div>
         <div class="login-options"><label class="remember-label"><input type="checkbox" id="rememberSession" checked> 本次浏览器会话保持登录</label></div>
         <p class="login-error" id="loginError" role="alert" aria-live="polite"></p>
-        <button class="login-submit" type="submit" id="loginSubmit">登 录 <span>→</span></button>
+        <button class="login-submit" type="submit" id="loginSubmit">验证身份并发送邮件 <span>→</span></button>
       </form>
       <form id="secondFactorForm" class="second-factor-form" hidden autocomplete="off" novalidate>
-        <div class="second-factor-step"><span class="second-factor-step-icon">02</span><div><strong>第二步 · 验证码核验</strong><p>密码已核对。请输入下面显示的6位验证码以继续。</p></div></div>
-        <label for="challengeInput">安全验证码</label>
-        <div class="captcha-box"><span id="challengeDisplay" class="captcha-code" aria-label="当前验证码"></span><button type="button" id="refreshChallenge" class="captcha-refresh" aria-label="更换验证码">↻ 更换</button></div>
-        <div class="login-field"><span class="field-prefix">▣</span><input type="text" id="challengeInput" name="captcha" inputmode="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="请输入6位验证码" maxlength="6" required></div>
-        <p class="captcha-lifetime">验证码两分钟内有效，字母不区分大小写。</p>
+        <div class="second-factor-step"><span class="second-factor-step-icon">02</span><div><strong>第二步 · 验证码核验</strong><p>邮箱密码已通过服务器验证。我们已向获准成员邮箱发送6位数字验证码。</p></div></div>
+        <label for="challengeInput">邮件一次性验证码（OTP）</label>
+        <div class="captcha-box"><span class="otp-mail-hint"><span aria-hidden="true">✉</span> 请查看获准邮箱收件箱</span><button type="button" id="refreshChallenge" class="captcha-refresh" aria-label="重新发送邮件验证码">↻ 重发邮件</button></div>
+        <div class="login-field"><span class="field-prefix">▣</span><input type="text" id="challengeInput" name="otp" inputmode="numeric" pattern="[0-9]{6}" autocomplete="one-time-code" spellcheck="false" placeholder="请输入邮件中的6位数字" maxlength="6" required></div>
+        <p class="captcha-lifetime">验证码5分钟内有效。重发需要间隔60秒；失败次数由服务器限制。</p>
         <p class="login-error" id="challengeError" role="alert" aria-live="polite"></p>
         <button class="login-submit" id="secondFactorSubmit" type="submit">验证并进入 <span>→</span></button>
         <button id="returnToLogin" class="back-to-login" type="button">← 返回账号登录</button>
       </form>
-      <p class="login-safety-note">登录含前端验证码与闲置超时机制，<strong>并非真正的多因素认证或服务端权限控制</strong>。公开仓库中的CSV仍可被直接访问。</p>
+      <p class="login-safety-note">此版本只有在云端服务配置完成后才能使用。访问私有数据需要服务器同时确认项目组身份与邮箱验证码。</p>
     </div>
   </div>
   <div class="login-bottom"><span>© GBD Research Hub · 科研数据平台</span><span>数据服务仅供科研参考</span></div>
@@ -117,6 +117,7 @@
 <aside class="details-drawer" id="detailsDrawer" aria-label="记录详情" aria-hidden="true"><div class="drawer-head"><div><small>RECORD DETAIL</small><h2>科研记录详情</h2></div><button id="drawerClose" aria-label="关闭详情" class="drawer-close">×</button></div><div class="drawer-body" id="drawerBody"></div><div class="drawer-footer"><button class="top-btn secondary-btn" id="copyRecordBtn">复制 JSON</button><button class="top-btn primary-btn" id="drawerBookmarkBtn">☆ 收藏记录</button></div></aside>
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 <input type="file" id="fileInput" accept=".csv,text/csv" hidden>
-<script src="auth.js?v=20261031-2" defer></script>
+<script src="secure-config.js?v=secure-1" defer></script>
+<script src="auth.js?v=secure-1" defer></script>
 </body>
 </html>
