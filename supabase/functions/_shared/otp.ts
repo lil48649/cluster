@@ -1,4 +1,4 @@
-import { createClient } from "npm:@supabase/supabase-js@2";
+import { createClient } from "npm:@supabase/supabase-js@2.57.0";
 
 const url = Deno.env.get("SUPABASE_URL") ?? "";
 const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -57,13 +57,10 @@ export async function getAuthorizedSession(req: Request) {
     return null;
   }
 
-  const { data: member, error: memberError } = await admin
-    .from("project_members")
-    .select("user_id")
-    .eq("user_id", user.id)
-    .eq("active", true)
-    .maybeSingle();
-  if (memberError || !member) return null;
+  const { data: isMember, error: memberError } = await admin.rpc(
+    "secure_member_is_active", { p_user_id: user.id }
+  );
+  if (memberError || isMember !== true) return null;
 
   return { userId: user.id, email: user.email, sessionId };
 }
