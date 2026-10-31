@@ -1,122 +1,23 @@
 <!doctype html>
 <html lang="zh-CN">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#10243c">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
-  <meta name="referrer" content="strict-origin-when-cross-origin">
-  <meta name="description" content="GBD 2023中国低体力活动归因疾病负担：科研数据查询与管理平台">
-  <title>GBD Research Hub · 科研数据管理系统</title>
-  <link rel="stylesheet" href="styles.css?v=20261031-2">
+  <meta http-equiv="refresh" content="0; url=./secure-preview/">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="referrer" content="no-referrer">
+  <title>GBD Research Hub · 安全版入口</title>
+  <style>
+    body{font-family:system-ui,-apple-system,"Microsoft Yahei",sans-serif;margin:0;min-height:100vh;display:grid;place-items:center;background:#f4f8fd;color:#243d5c}
+    main{text-align:center;max-width:460px;padding:32px}
+    a{color:#1769c2}
+  </style>
 </head>
 <body>
-<section class="login-screen" id="loginScreen" aria-labelledby="loginTitle">
-  <div class="login-topline"><div class="login-top-brand"><span class="login-top-cross">✚</span><div><strong>GBD RESEARCH HUB</strong><small>CHRONIC DISEASE RESEARCH PLATFORM</small></div></div><span class="login-top-right">科研数据库 · GBD 2023</span></div>
-  <div class="login-heading"><span>RESEARCH DATA MANAGEMENT</span><h1 id="loginTitle">慢性病科研数据管理系统</h1><p>中国低体力活动归因疾病负担 · 数据检索与统计分析平台</p></div>
-  <div class="login-card">
-    <div class="login-visual" aria-hidden="true">
-      <div class="login-visual-glow"></div><div class="medical-panel"><div class="medical-panel-top"><span>GBD / 2023</span><span>● ● ●</span></div><div class="medical-panel-content"><div class="medical-panel-symbol">✚</div><div class="medical-panel-lines"><b></b><b></b><b></b></div></div><div class="medical-chart"><svg width="220" height="72" viewBox="0 0 220 72" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M0 53 L25 53 L37 37 L51 57 L68 12 L84 63 L107 40 L124 40 L138 21 L158 48 L178 29 L198 43 L220 16" fill="none" stroke="#2987ed" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
-      <div class="login-visual-footer"><span class="visual-status-dot"></span> IHME GLOBAL BURDEN OF DISEASE <span class="visual-year">1990 — 2023</span></div>
-    </div>
-    <div class="login-form-wrap">
-      <div class="login-form-eyebrow">WELCOME BACK</div><h2>登录管理平台</h2><p class="login-subtitle">请使用项目组账号登录科研数据管理系统</p>
-      <form id="loginForm" autocomplete="on" novalidate>
-        <label for="loginRole">登录角色</label><div class="login-field"><span class="field-prefix">▦</span><select id="loginRole" name="role" required><option value="" selected disabled>请选择登录角色</option><option value="project">项目组</option></select></div>
-        <label for="loginUsername">登录账号</label><div class="login-field"><span class="field-prefix">♙</span><input type="text" id="loginUsername" name="username" autocomplete="username" spellcheck="false" placeholder="请输入账号" required maxlength="80"></div>
-        <label for="loginPassword">登录密码</label><div class="login-field"><span class="field-prefix">◇</span><input type="password" id="loginPassword" name="password" autocomplete="current-password" placeholder="请输入密码" required><button id="togglePassword" class="login-eye" type="button" aria-label="显示密码" aria-pressed="false">显示</button></div>
-        <div class="login-options"><label class="remember-label"><input type="checkbox" id="rememberSession" checked> 本次浏览器会话保持登录</label></div>
-        <p class="login-error" id="loginError" role="alert" aria-live="polite"></p>
-        <button class="login-submit" type="submit" id="loginSubmit">登 录 <span>→</span></button>
-      </form>
-      <form id="secondFactorForm" class="second-factor-form" hidden autocomplete="off" novalidate>
-        <div class="second-factor-step"><span class="second-factor-step-icon">02</span><div><strong>第二步 · 验证码核验</strong><p>密码已核对。请输入下面显示的6位验证码以继续。</p></div></div>
-        <label for="challengeInput">安全验证码</label>
-        <div class="captcha-box"><span id="challengeDisplay" class="captcha-code" aria-label="当前验证码"></span><button type="button" id="refreshChallenge" class="captcha-refresh" aria-label="更换验证码">↻ 更换</button></div>
-        <div class="login-field"><span class="field-prefix">▣</span><input type="text" id="challengeInput" name="captcha" inputmode="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="请输入6位验证码" maxlength="6" required></div>
-        <p class="captcha-lifetime">验证码两分钟内有效，字母不区分大小写。</p>
-        <p class="login-error" id="challengeError" role="alert" aria-live="polite"></p>
-        <button class="login-submit" id="secondFactorSubmit" type="submit">验证并进入 <span>→</span></button>
-        <button id="returnToLogin" class="back-to-login" type="button">← 返回账号登录</button>
-      </form>
-      <p class="login-safety-note">登录含前端验证码与闲置超时机制，<strong>并非真正的多因素认证或服务端权限控制</strong>。公开仓库中的CSV仍可被直接访问。</p>
-    </div>
-  </div>
-  <div class="login-bottom"><span>© GBD Research Hub · 科研数据平台</span><span>数据服务仅供科研参考</span></div>
-  <div class="login-cityline" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
-</section>
-<div class="app" id="app">
-  <aside class="sidebar" id="sidebar">
-    <div class="brand">
-      <div class="brand-logo"><span class="brand-mark">✚</span></div>
-      <div><div class="brand-title">GBD Research Hub</div><div class="brand-subtitle">科研数据管理工作台</div></div>
-    </div>
-    <div class="workspace"><span class="workspace-icon">◇</span><div><strong>China GBD 2023</strong><small>低体力活动 · 归因负担</small></div><span class="workspace-chevron">⌄</span></div>
-    <div class="nav-label">工作空间</div>
-    <nav class="navigation" aria-label="主导航">
-      <button class="nav-item active" data-page="dashboard"><span class="nav-ico">▦</span><span>数据总览</span><span class="nav-arrow">›</span></button>
-      <button class="nav-item" data-page="records"><span class="nav-ico">≡</span><span>数据档案</span><span class="nav-count" id="sideCount">72</span></button>
-      <button class="nav-item" data-page="compare"><span class="nav-ico">◫</span><span>跨年比较</span></button>
-      <button class="nav-item" data-page="dictionary"><span class="nav-ico">▤</span><span>字段字典</span></button>
-      <button class="nav-item" data-page="quality"><span class="nav-ico">◉</span><span>质量核验</span></button>
-    </nav>
-    <div class="sidebar-bottom"><div class="source-card"><span class="source-light"></span><div><strong>数据源已连接</strong><small>IHME · GBD 2023</small></div></div><div class="sidebar-footer">Research Data Portal <span>v1.0</span></div></div>
-  </aside>
-  <div class="main-shell">
-    <header class="topbar">
-      <div class="topbar-left"><button class="mobile-menu icon-button" id="menuBtn" aria-label="展开导航">☰</button><div class="breadcrumbs">工作空间 <span>/</span> <strong id="breadcrumb">数据总览</strong></div></div>
-      <div class="topbar-right"><span class="top-source"><span class="online-dot"></span> 本地静态数据</span><span class="user-pill"><span class="user-avatar">项</span>项目组</span><button class="top-btn secondary-btn logout-btn" id="logoutBtn" type="button">退出登录</button><button class="top-btn secondary-btn" id="importBtn"><span>↥</span> 导入CSV</button><button class="top-btn primary-btn" id="exportBtn" hidden><span>⇩</span> 导出数据</button></div>
-    </header>
-    <main class="main-content" id="mainContent">
-      <section class="page active-page" id="page-dashboard">
-        <div class="page-heading"><div><div class="eyebrow"><span class="eyebrow-line"></span> POPULATION HEALTH DATA PLATFORM</div><h1>疾病负担数据总览</h1><p>中国低体力活动归因的三类慢性疾病负担 · GBD 2023</p></div><span class="research-badge">科研数据 · 非临床病历</span></div>
-        <div class="toolbar context-toolbar"><div class="toolbar-text">分析维度 <span class="hint">以下指标仅汇总三种病因，避免跨指标、跨性别重复计数</span></div><div class="field-row"><label>年份 <select id="dashYear"><option value="2023">2023</option><option value="1990">1990</option></select></label><label>性别 <select id="dashSex"><option value="Both">总体</option><option value="Male">男性</option><option value="Female">女性</option></select></label></div></div>
-        <div class="kpi-grid" id="kpiGrid"><div class="loading">正在载入统计摘要…</div></div>
-        <div class="charts-grid">
-          <article class="panel chart-panel"><div class="panel-head"><div><h2>主要疾病负担变化</h2><p>同一疾病和指标在1990年与2023年的比较</p></div><div class="panel-actions"><label class="mini-label" for="chartMeasure">指标</label><select id="chartMeasure"></select></div></div><div class="chart-legend"><span><i class="legend-dot year-old"></i>1990</span><span><i class="legend-dot year-new"></i>2023</span></div><div class="bar-chart" id="causeChart"></div></article>
-          <article class="panel chart-panel compact-panel"><div class="panel-head"><div><h2>2023 年病种构成</h2><p id="donutSubtitle">总体 · 当前选择指标</p></div></div><div class="donut-stack"><div class="donut-chart" id="donutChart"><div class="donut-core"><small>三病种合计</small><strong id="donutTotal">—</strong></div></div><div class="donut-legend" id="donutLegend"></div></div></article>
-        </div>
-        <div class="lower-grid">
-          <article class="panel"><div class="panel-head"><div><h2>数据收录概况</h2><p>源CSV所包含的数据维度</p></div><span class="panel-tag">Source Overview</span></div><div class="scope-grid" id="scopeGrid"></div></article>
-          <article class="panel note-panel"><div class="panel-head"><div><h2>分析提示</h2><p>使用本平台数据时请注意</p></div></div><div class="insight-list"><div><span class="insight-icon">01</span><p>仅有 <strong>1990、2023</strong> 两个观测年份，图表表示端点比较，而非连续年度趋势。</p></div><div><span class="insight-icon">02</span><p><strong>Both</strong> 与 Male / Female 属于重叠统计层级，请勿相加。</p></div><div><span class="insight-icon">03</span><p>不确定区间仅对单条原始估计提供，汇总值<strong>不计算虚构的区间</strong>。</p></div></div></article>
-        </div>
-      </section>
-      <section class="page" id="page-records">
-        <div class="page-heading"><div><div class="eyebrow"><span class="eyebrow-line"></span> DATA RECORDS</div><h1>科研数据档案</h1><p>多条件检索、排序、查看原始记录和导出筛选结果</p></div><span class="research-badge" id="recordBadge">72 条源记录</span></div>
-        <div class="panel records-panel">
-          <div class="record-toolbar"><div class="search-wrapper"><span>⌕</span><input id="recordSearch" type="search" placeholder="搜索疾病、指标、编号、年份或性别…" aria-label="搜索数据记录"></div><div class="record-actions"><button class="top-btn secondary-btn" id="bookmarkBtn">☆ 仅看收藏</button><button class="top-btn secondary-btn" id="resetBtn">↺ 重置筛选</button></div></div>
-          <div class="filters-row"><label>疾病类型<select id="filterCause"><option value="">全部疾病</option></select></label><label>负担指标<select id="filterMeasure"><option value="">全部指标</option></select></label><label>性别<select id="filterSex"><option value="">全部性别</option><option value="Both">总体</option><option value="Male">男性</option><option value="Female">女性</option></select></label><label>年份<select id="filterYear"><option value="">全部年份</option><option value="1990">1990</option><option value="2023">2023</option></select></label></div>
-          <div class="table-status"><strong id="tableStatus">共 72 条记录</strong><span>点击表头可排序；点击行查看完整字段和原始数值</span></div>
-          <div class="table-scroller"><table class="data-table"><thead><tr><th data-sort="id">记录编号 <span>↕</span></th><th data-sort="cause">疾病类型 <span>↕</span></th><th data-sort="measure">指标 <span>↕</span></th><th data-sort="sex">性别 <span>↕</span></th><th data-sort="year">年份 <span>↕</span></th><th data-sort="val">估计值 <span>↕</span></th><th>不确定区间（95% UI）</th><th>操作</th></tr></thead><tbody id="tableBody"></tbody></table></div>
-          <div class="table-footer"><span id="pageInfo"></span><div class="pager"><label for="pageSize">每页 <select id="pageSize"><option value="10">10</option><option value="20">20</option><option value="50">50</option></select></label><button class="pager-btn" id="prevPage" aria-label="上一页">‹</button><span id="pageNumber"></span><button class="pager-btn" id="nextPage" aria-label="下一页">›</button></div></div>
-        </div>
-      </section>
-      <section class="page" id="page-compare">
-        <div class="page-heading"><div><div class="eyebrow"><span class="eyebrow-line"></span> COMPARATIVE ANALYSIS</div><h1>1990—2023 跨年比较</h1><p>按疾病对比两个观测端点的估计值与相对变化</p></div><span class="research-badge">端点对比 · 非时间序列</span></div>
-        <div class="toolbar context-toolbar"><div class="toolbar-text">比较条件 <span class="hint">精确匹配同一疾病、性别与指标</span></div><div class="field-row"><label>指标 <select id="compareMeasure"></select></label><label>性别 <select id="compareSex"><option value="Both">总体</option><option value="Male">男性</option><option value="Female">女性</option></select></label></div></div>
-        <div class="compare-overview" id="compareOverview"></div>
-        <article class="panel compare-panel"><div class="panel-head"><div><h2>疾病分项变化明细</h2><p>1990年与2023年估计值、差值和变化幅度</p></div><button class="top-btn secondary-btn" id="compareExportBtn">⇩ 下载对比结果</button></div><div class="table-scroller"><table class="data-table compare-table"><thead><tr><th>疾病</th><th>1990年</th><th>2023年</th><th>绝对变化</th><th>相对变化</th><th>变化方向</th></tr></thead><tbody id="compareBody"></tbody></table></div></article>
-        <article class="panel"><div class="panel-head"><div><h2>变化幅度可视化</h2><p>以同一疾病1990年估计值为比较基准</p></div></div><div id="changeBars" class="change-bars"></div></article>
-      </section>
-      <section class="page" id="page-dictionary">
-        <div class="page-heading"><div><div class="eyebrow"><span class="eyebrow-line"></span> DATA DICTIONARY</div><h1>数据字典</h1><p>完整记录源CSV中的12个字段及其研究含义</p></div><span class="research-badge">原始字段不重命名</span></div>
-        <div class="panel"><div class="panel-head"><div><h2>字段定义</h2><p>所有字段来自本次上传的CSV文件</p></div><span class="panel-tag">12 columns</span></div><div class="table-scroller"><table class="data-table dictionary-table"><thead><tr><th>原始字段名</th><th>中文含义</th><th>数据类型</th><th>示例 / 说明</th></tr></thead><tbody id="dictionaryBody"></tbody></table></div></div>
-        <div class="notice"><span>ⓘ</span><div><strong>指标解释</strong><p>Deaths：死亡人数；DALYs：伤残调整寿命年；YLLs：早死所致寿命损失年；YLDs：伤残所致健康寿命损失年。原始 metric 为 Number，故本平台不将其误标为年龄标准化率。</p></div></div>
-      </section>
-      <section class="page" id="page-quality">
-        <div class="page-heading"><div><div class="eyebrow"><span class="eyebrow-line"></span> QUALITY CONTROL</div><h1>数据质量核验</h1><p>透明显示源CSV的完整性、取值和组合覆盖情况</p></div><span class="research-badge">仅核查 · 不自动改写</span></div>
-        <div class="quality-grid" id="qualityGrid"></div>
-        <article class="panel"><div class="panel-head"><div><h2>校验项目</h2><p>字段完整性、主键唯一性、区间边界和覆盖矩阵</p></div><span class="panel-tag">Automatic Checks</span></div><div id="qualityChecks" class="quality-checks"></div></article>
-        <div class="notice"><span>!</span><div><strong>使用声明</strong><p>本页面只检查结构性质量，不判断 GBD 建模估计的临床或统计学有效性；发现不确定区间下限为负时保留原值，供研究人员核对原始数据源。</p></div></div>
-      </section>
-    </main>
-    <footer class="footer"><span>GBD Research Hub · 科研数据管理系统</span><span>数据来源：用户上传的 IHME GBD 2023 CSV ｜ 数据处理均在本地浏览器执行</span></footer>
-  </div>
-</div>
-<div class="scrim" id="scrim" hidden></div>
-<aside class="details-drawer" id="detailsDrawer" aria-label="记录详情" aria-hidden="true"><div class="drawer-head"><div><small>RECORD DETAIL</small><h2>科研记录详情</h2></div><button id="drawerClose" aria-label="关闭详情" class="drawer-close">×</button></div><div class="drawer-body" id="drawerBody"></div><div class="drawer-footer"><button class="top-btn secondary-btn" id="copyRecordBtn">复制 JSON</button><button class="top-btn primary-btn" id="drawerBookmarkBtn">☆ 收藏记录</button></div></aside>
-<div id="toast" class="toast" role="status" aria-live="polite"></div>
-<input type="file" id="fileInput" accept=".csv,text/csv" hidden>
-<script src="auth.js?v=20261031-2" defer></script>
+  <main>
+    <h1>GBD 科研数据管理系统</h1>
+    <p>旧版入口已停用，正在转至通过 Supabase 双重认证的安全版管理系统。</p>
+    <p><a href="./secure-preview/">进入安全版管理系统</a></p>
+  </main>
 </body>
 </html>
