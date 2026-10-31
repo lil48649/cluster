@@ -5,3 +5,97 @@
   .top-btn#importBtn{display:inline-flex;width:37px;padding:0;font-size:0}
   .top-btn#importBtn span{font-size:19px}
 }
+
+
+/* GBD Research Hub · static-site project login overlay */
+html:not(.authenticated) .app,
+html:not(.authenticated) .scrim,
+html:not(.authenticated) .details-drawer,
+html:not(.authenticated) .toast{display:none!important}
+html.authenticated .login-screen{display:none!important}
+.login-screen{position:relative;isolation:isolate;min-height:100svh;display:flex;flex-direction:column;align-items:center;padding:30px 32px 26px;color:#fff;overflow:hidden;background:linear-gradient(122deg,#0a75e7 0%,#218ef9 56%,#0e77e2 100%)}
+.login-screen:before{content:"";position:absolute;z-index:-2;width:950px;height:950px;border-radius:50%;top:-590px;right:-300px;background:radial-gradient(circle,rgba(255,255,255,.15),transparent 72%)}
+.login-screen:after{content:"";position:absolute;z-index:-2;width:600px;height:600px;border-radius:50%;bottom:-470px;left:-130px;background:radial-gradient(circle,rgba(138,215,254,.2),transparent 75%)}
+.login-topline{width:min(1250px,100%);display:flex;justify-content:space-between;align-items:center;gap:16px}
+.login-top-brand{display:flex;gap:12px;align-items:center}
+.login-top-cross{height:38px;width:38px;border:1px solid rgba(255,255,255,.32);background:rgba(255,255,255,.14);border-radius:10px;font-size:24px;display:grid;place-items:center}
+.login-top-brand strong{display:block;font-size:14px;letter-spacing:1.6px}
+.login-top-brand small{display:block;font-size:8px;letter-spacing:1.7px;margin-top:3px;color:#d6edff}
+.login-top-right{font-size:12px;letter-spacing:1.5px;color:#e6f3ff}
+.login-heading{text-align:center;position:relative;z-index:1;margin:48px 0 35px}
+.login-heading>span{font-size:11px;font-weight:700;letter-spacing:2.8px;color:#d1ebff}
+.login-heading h1{font-size:clamp(27px,3.3vw,43px);letter-spacing:2px;color:#fff;font-weight:800;margin:12px 0}
+.login-heading p{color:#e1f0ff;font-size:13px;letter-spacing:1px}
+.login-card{width:min(1000px,100%);border-radius:17px;background:#fff;box-shadow:0 25px 65px rgba(4,60,139,.17);display:grid;grid-template-columns:1.05fr 1fr;overflow:hidden;position:relative;z-index:1;min-height:505px;color:#1d354d}
+.login-visual{position:relative;background:linear-gradient(135deg,#f5faff 0%,#e7f3ff 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:0;padding:35px 23px 25px;border-right:1px solid #e8f0f9}
+.login-visual-glow{position:absolute;width:320px;height:320px;border-radius:50%;border:1px solid #d9eaff;box-shadow:0 0 0 33px rgba(194,220,250,.11),0 0 0 65px rgba(194,220,250,.09)}
+.medical-panel{width:min(320px,90%);height:236px;border:1px solid #bbdaf5;position:relative;border-radius:15px;z-index:1;background:linear-gradient(145deg,rgba(255,255,255,.95),rgba(224,241,255,.92));box-shadow:0 24px 44px rgba(41,113,189,.15);transform:rotate(-3deg)}
+.medical-panel-top{height:41px;border-bottom:1px solid #d7e9f8;display:flex;justify-content:space-between;align-items:center;padding:0 18px;font-size:10px;color:#7da6cc;font-weight:800;letter-spacing:1px}
+.medical-panel-content{display:flex;align-items:center;gap:17px;padding:23px 21px 4px}
+.medical-panel-symbol{width:58px;height:58px;display:grid;place-items:center;border-radius:16px;background:#2378dd;color:#fff;font-size:38px;box-shadow:0 9px 21px rgba(40,128,223,.25)}
+.medical-panel-lines{display:flex;flex-direction:column;gap:8px;flex:1}
+.medical-panel-lines b{height:10px;background:#d5e8fa;border-radius:5px}
+.medical-panel-lines b:nth-child(2){width:73%}
+.medical-panel-lines b:nth-child(3){width:88%}
+.medical-chart{margin:15px 22px;border-radius:9px;background:linear-gradient(180deg,#eaf5ff,rgba(255,255,255,.2));height:87px;display:flex;justify-content:center;align-items:center;overflow:hidden}
+.medical-chart svg{max-width:95%}
+.login-visual-footer{position:relative;z-index:2;margin-top:31px;font-size:10px;color:#5c8ab0;font-weight:750;letter-spacing:1.1px;text-align:center;display:flex;align-items:center;gap:7px;flex-wrap:wrap;justify-content:center}
+.visual-year{color:#317fbd}
+.visual-status-dot{height:7px;width:7px;border-radius:50%;background:#29bba4}
+.login-form-wrap{padding:43px clamp(24px,4vw,60px) 27px;min-width:0}
+.login-form-eyebrow{font-size:11px;font-weight:800;letter-spacing:1.4px;color:#348eea;margin-bottom:11px}
+.login-form-wrap h2{font-size:25px;font-weight:800;letter-spacing:.2px;color:#183655}
+.login-subtitle{font-size:12px;color:#92a1b2;line-height:1.7;margin:11px 0 24px}
+#loginForm>label{display:block;color:#405c77;font-size:12px;font-weight:700;margin-bottom:8px}
+.login-field{position:relative;display:flex;align-items:center;margin-bottom:19px}
+.login-field input,.login-field select{height:43px;width:100%;border-radius:8px;border:1px solid #dfe8f2;background:#f8fbff;color:#244463;outline:none;padding:0 44px;font-size:13px;transition:border-color .2s,box-shadow .2s}
+.login-field input:focus,.login-field select:focus{border-color:#419bfa;box-shadow:0 0 0 3px rgba(40,132,240,.13)}
+.login-field input::placeholder{color:#a5b4c4}
+.login-field .field-prefix{position:absolute;left:15px;color:#7f9ebd;font-size:19px;pointer-events:none}
+.login-eye{border:0;background:transparent;color:#5884b1;position:absolute;right:11px;top:5px;height:34px;padding:0 3px;font-size:11px}
+.login-options{margin:-5px 0 14px}
+.remember-label{display:flex;gap:7px;align-items:center;font-size:11px;color:#8a9aab;cursor:pointer}
+.remember-label input{accent-color:#2f83e7}
+.login-error{min-height:19px;font-size:11px;color:#be394b;line-height:1.5;margin-bottom:9px}
+.login-submit{height:43px;width:100%;background:linear-gradient(100deg,#1784ef,#3b9bf9);color:#fff;border:0;border-radius:7px;letter-spacing:3px;font-weight:750;font-size:13px;box-shadow:0 7px 18px rgba(30,133,244,.19)}
+.login-submit span{letter-spacing:0;margin-left:6px;font-size:17px}
+.login-submit:hover:not(:disabled){background:linear-gradient(100deg,#126dcd,#2488e8)}
+.login-submit:disabled{opacity:.65;cursor:wait}
+.login-safety-note{font-size:10px;color:#95a7b8;line-height:1.75;margin-top:19px}
+.login-safety-note strong{font-weight:700;color:#718fa6}
+.login-bottom{display:flex;justify-content:space-between;width:min(1000px,100%);margin-top:27px;font-size:11px;color:#e0f1ff;letter-spacing:.2px;z-index:1}
+.login-cityline{position:absolute;left:0;right:0;bottom:0;height:200px;display:flex;gap:2%;align-items:flex-end;z-index:-1;opacity:.16;pointer-events:none}
+.login-cityline i{flex:1;display:block;background:repeating-linear-gradient(0deg,transparent 0,transparent 15px,rgba(255,255,255,.65) 16px,rgba(255,255,255,.65) 18px),linear-gradient(90deg,#c8ebff,#fff);height:45%;border-radius:3px 3px 0 0}
+.login-cityline i:nth-child(3n){height:80%}.login-cityline i:nth-child(4n){height:64%}.login-cityline i:nth-child(5n){height:100%}
+.login-cityline i:nth-child(7n){height:35%}
+.user-pill{font-size:11px;display:inline-flex;align-items:center;gap:7px;color:#56718c;white-space:nowrap}
+.user-avatar{width:24px;height:24px;border-radius:7px;background:#e9f6f2;display:grid;place-items:center;color:#148b72;font-weight:800;font-size:12px}
+.logout-btn{color:#5f7c96;min-height:31px;padding:0 11px}
+@media(max-width:780px){
+  .login-screen{padding:21px 18px 30px}
+  .login-heading{margin:37px 0 24px}
+  .login-card{max-width:500px;grid-template-columns:1fr}
+  .login-visual{min-height:170px;overflow:hidden;padding:16px}
+  .login-visual-glow{width:220px;height:220px}
+  .medical-panel{height:125px;width:190px;transform:rotate(-4deg);margin-top:-6px}
+  .medical-panel-top{height:27px;font-size:7px}
+  .medical-panel-content{gap:9px;padding:13px}
+  .medical-panel-symbol{width:31px;height:31px;font-size:20px;border-radius:8px}
+  .medical-panel-lines{gap:5px}.medical-panel-lines b{height:6px}
+  .medical-chart{height:27px;margin:0 13px}.medical-chart svg{height:35px}
+  .login-visual-footer{margin-top:13px;font-size:8px}
+  .login-form-wrap{padding:27px 30px 31px}
+  .login-top-right{display:none}
+  .login-bottom{max-width:500px;font-size:10px}
+}
+@media(max-width:520px){
+ .login-heading h1{font-size:25px;letter-spacing:.2px}
+ .login-heading p{font-size:11px;line-height:1.7}
+ .login-top-brand strong{font-size:12px}
+ .login-form-wrap{padding:25px 22px}
+ .login-visual{min-height:140px}
+ .login-bottom{flex-direction:column;gap:5px;text-align:center}
+ .user-pill{display:none}
+ .topbar{gap:5px}
+ .logout-btn{font-size:10px;padding:0 7px}
+}
