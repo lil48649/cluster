@@ -150,17 +150,48 @@
   }
 
   function showEnrollment(data) {
-    const raw = String(data && data.totp && data.totp.qr_code || "");
-    const img = $("totpQr");
-    let source = "";
-    if (raw.startsWith("data:image/svg+xml")) source = raw;
-    else if (raw.trim().startsWith("<svg")) {
-      source = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(raw);
-    }
-    img.hidden = !source;
-    if (source) img.src = source;
-    $("totpSecret").textContent = String(data && data.totp && data.totp.secret || "");
+    const totp = data && data.totp || {};
+    const secret = String(totp.secret || "").replace(/\s+/g, "").toUpperCase();
+    $("totpSecret").textContent = secret;
     showSecondStep(true);
+
+    // Render entirely in this browser: QR data must never be sent to an
+    // external QR-generation service. The authenticated Supabase enrollment
+    // secret is also available for manual entry if the browser has no QR support.
+    const target = $("totpQr");
+    target.textContent = "";
+    target.hidden = true;
+    if (!/^[A-Z2-7]{16,}$/.test(secret)) {
+      showError("challengeError", "绑定密钥格式异常，请退出后重新登录生成新密钥。");
+      return;
+    }
+
+    const uri = typeof totp.uri === "string" && totp.uri.startsWith("otpauth://totp/")
+      ? totp.uri
+      : "otpauth://totp/" + encodeURIComponent(
+        "GBD Research Hub:" + $("loginUsername").value.trim()
+      ) + "?secret=" + encodeURIComponent(secret) +
+        "&issuer=" + encodeURIComponent("GBD Research Hub") +
+        "&algorithm=SHA1&digits=6&period=30";
+
+    try {
+      if (typeof window.QRCode !== "function") {
+        throw new Error("QR renderer unavailable");
+      }
+      new window.QRCode(target, {
+        text: uri,
+        width: 192,
+        height: 192,
+        colorDark: "#172a45",
+        colorLight: "#ffffff",
+        correctLevel: window.QRCode.CorrectLevel.M
+      });
+      target.hidden = false;
+    } catch (error) {
+      target.textContent = "";
+      target.hidden = true;
+      showError("challengeError", "二维码暂时无法显示，可手动添加上方密钥，或刷新页面重新登录。");
+    }
   }
 
   async function enrollOrChallenge() {
