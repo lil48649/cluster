@@ -134,3 +134,10 @@ html.authenticated .login-screen{display:none!important}
 .totp-manual{margin:9px 0;padding:9px;background:#fff;border:1px solid #d6e7f5;border-radius:7px;overflow-wrap:anywhere}
 .totp-manual span{display:block;color:#567c9a;font-size:10px}
 .totp-manual code{display:block;margin-top:5px;font-size:11px;color:#265d93;letter-spacing:1px;user-select:all}
+
+/* QR is rendered locally from the authenticated TOTP provisioning URI.
+   The secret is not sent to any external service. */
+.totp-qr[hidden]{display:none!important}
+.totp-qr{display:flex;align-items:center;justify-content:center;margin:14px auto;padding:12px;background:#fff;border:1px solid #d4e5f5;border-radius:12px;width:max-content;max-width:100%;min-width:218px;min-height:218px;box-shadow:0 4px 15px rgba(25,66,113,.07)}
+.totp-qr canvas,.totp-qr img{display:block!important;width:192px!important;height:192px!important;max-width:100%;object-fit:contain;margin:0!important;border:0!important;padding:0!important;border-radius:0!important}
+.totp-qr canvas:has(+ img:not([style*="display: none"])) {display:none!important}
