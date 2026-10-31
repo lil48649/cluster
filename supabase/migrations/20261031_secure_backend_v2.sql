@@ -44,9 +44,9 @@ grant select, insert, update, delete on all tables in schema app_private to serv
 -- Service-only active session lookup, isolated from the exposed API schema.
 create or replace function app_private.is_active_session(p_user_id uuid,p_session_id uuid)
 returns boolean language sql stable security definer set search_path = ''
-as $
+as $session_check$
  select exists(select 1 from auth.sessions where id=p_session_id and user_id=p_user_id)
-$;
+$session_check$;
 revoke execute on function app_private.is_active_session(uuid,uuid) from public, anon, authenticated;
 grant execute on function app_private.is_active_session(uuid,uuid) to service_role;
 
