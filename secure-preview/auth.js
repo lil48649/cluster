@@ -129,7 +129,7 @@
     $("totpSecret").textContent = "";
     $("totpQr").removeAttribute("src");
     const script = document.createElement("script");
-    script.src = "app.js?v=totp-2";
+    script.src = "app.js?v=storage-fix-20261031";
     script.onerror = function () {
       appLoaded = false;
       document.documentElement.classList.remove("authenticated");
