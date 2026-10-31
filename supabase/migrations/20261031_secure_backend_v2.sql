@@ -41,6 +41,15 @@ alter table app_private.otp_send_quotas enable row level security;
 revoke all on all tables in schema app_private from public, anon, authenticated;
 grant select, insert, update, delete on all tables in schema app_private to service_role;
 
+-- Service-only active session lookup, isolated from the exposed API schema.
+create or replace function app_private.is_active_session(p_user_id uuid,p_session_id uuid)
+returns boolean language sql stable security definer set search_path = ''
+as $
+ select exists(select 1 from auth.sessions where id=p_session_id and user_id=p_user_id)
+$;
+revoke execute on function app_private.is_active_session(uuid,uuid) from public, anon, authenticated;
+grant execute on function app_private.is_active_session(uuid,uuid) to service_role;
+
 create or replace function public.secure_begin_email_otp(
  p_user_id uuid,p_session_id uuid,p_code_hash text
 ) returns boolean
@@ -50,7 +59,7 @@ declare
  v_quota app_private.otp_send_quotas%rowtype;
 begin
  if not exists(select 1 from app_private.project_members where user_id=p_user_id and active) then return false; end if;
- if not exists(select 1 from auth.sessions where id=p_session_id and user_id=p_user_id) then return false; end if;
+ if not (select app_private.is_active_session(p_user_id,p_session_id)) then return false; end if;
  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(p_user_id::text, 9837));
  if exists(select 1 from app_private.otp_challenges
            where user_id=p_user_id and sent_at>now()-interval '60 seconds') then return false; end if;
@@ -77,7 +86,7 @@ as $$
 declare v app_private.otp_challenges%rowtype;
 begin
  if not exists(select 1 from app_private.project_members where user_id=p_user_id and active) then return false; end if;
- if not exists(select 1 from auth.sessions where id=p_session_id and user_id=p_user_id) then return false; end if;
+ if not (select app_private.is_active_session(p_user_id,p_session_id)) then return false; end if;
  select * into v from app_private.otp_challenges
  where user_id=p_user_id and session_id=p_session_id for update;
  if not found or v.expires_at<=now() or v.attempts>=5 then return false; end if;
