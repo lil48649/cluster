@@ -8,7 +8,7 @@
   <meta name="referrer" content="strict-origin-when-cross-origin">
   <meta name="description" content="GBD 2023中国低体力活动归因疾病负担：科研数据查询与管理平台">
   <title>GBD Research Hub · 科研数据管理系统</title>
-  <link rel="stylesheet" href="styles.css?v=20261031-2">
+  <link rel="stylesheet" href="styles.css?v=totp-2">
 </head>
 <body>
 <section class="login-screen" id="loginScreen" aria-labelledby="loginTitle">
@@ -27,19 +27,26 @@
         <label for="loginPassword">个人登录密码</label><div class="login-field"><span class="field-prefix">◇</span><input type="password" id="loginPassword" name="password" autocomplete="current-password" placeholder="请输入密码" required><button id="togglePassword" class="login-eye" type="button" aria-label="显示密码" aria-pressed="false">显示</button></div>
         <div class="login-options"><label class="remember-label"><input type="checkbox" id="rememberSession" checked> 本次浏览器会话保持登录</label></div>
         <p class="login-error" id="loginError" role="alert" aria-live="polite"></p>
-        <button class="login-submit" type="submit" id="loginSubmit">验证身份并发送邮件 <span>→</span></button>
+        <button class="login-submit" type="submit" id="loginSubmit">验证账号并继续 <span>→</span></button>
       </form>
       <form id="secondFactorForm" class="second-factor-form" hidden autocomplete="off" novalidate>
-        <div class="second-factor-step"><span class="second-factor-step-icon">02</span><div><strong>第二步 · 验证码核验</strong><p>邮箱密码已通过服务器验证。我们已向获准成员邮箱发送6位数字验证码。</p></div></div>
-        <label for="challengeInput">邮件一次性验证码（OTP）</label>
-        <div class="captcha-box"><span class="otp-mail-hint"><span aria-hidden="true">✉</span> 请查看获准邮箱收件箱</span><button type="button" id="refreshChallenge" class="captcha-refresh" aria-label="重新发送邮件验证码">↻ 重发邮件</button></div>
-        <div class="login-field"><span class="field-prefix">▣</span><input type="text" id="challengeInput" name="otp" inputmode="numeric" pattern="[0-9]{6}" autocomplete="one-time-code" spellcheck="false" placeholder="请输入邮件中的6位数字" maxlength="6" required></div>
-        <p class="captcha-lifetime">验证码5分钟内有效。重发需要间隔60秒；失败次数由服务器限制。</p>
+        <div class="second-factor-step"><span class="second-factor-step-icon">02</span><div><strong>第二步 · 验证码核验</strong><p>账号密码已验证，请输入手机身份验证器中的动态验证码。</p></div></div>
+        <label for="challengeInput">手机动态验证码（TOTP）</label>
+        <div id="totpSetup" class="totp-setup" hidden>
+          <strong>首次登录 · 绑定手机验证器</strong>
+          <p>请使用 Google Authenticator 或 Microsoft Authenticator 扫描二维码。请勿截图或向他人透露密钥。</p>
+          <img id="totpQr" alt="当前账号的 TOTP 绑定二维码" width="176" height="176" hidden>
+          <div class="totp-manual"><span>无法扫码？在验证器中手动添加密钥：</span><code id="totpSecret"></code></div>
+          <p>绑定后请在下方输入验证器显示的6位数字，完成首次验证。</p>
+        </div>
+        <div class="captcha-box"><span class="otp-mail-hint"><span aria-hidden="true">▣</span> 在手机身份验证器中查看6位数字</span></div>
+        <div class="login-field"><span class="field-prefix">▣</span><input type="text" id="challengeInput" name="otp" inputmode="numeric" pattern="[0-9]{6}" autocomplete="one-time-code" spellcheck="false" placeholder="请输入验证器显示的6位数字" maxlength="6" required></div>
+        <p class="captcha-lifetime">验证码通常每30秒更新一次；输错后可使用最新一组数字重试。</p>
         <p class="login-error" id="challengeError" role="alert" aria-live="polite"></p>
         <button class="login-submit" id="secondFactorSubmit" type="submit">验证并进入 <span>→</span></button>
         <button id="returnToLogin" class="back-to-login" type="button">← 返回账号登录</button>
       </form>
-      <p class="login-safety-note">此版本只有在云端服务配置完成后才能使用。访问私有数据需要服务器同时确认项目组身份与邮箱验证码。</p>
+      <p class="login-safety-note">此版本只有在云端服务配置完成后才能使用。访问私有数据必须由 Supabase 验证项目组身份与手机 TOTP 双因素认证。</p>
     </div>
   </div>
   <div class="login-bottom"><span>© GBD Research Hub · 科研数据平台</span><span>数据服务仅供科研参考</span></div>
@@ -118,6 +125,6 @@
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 <input type="file" id="fileInput" accept=".csv,text/csv" hidden>
 <script src="secure-config.js?v=secure-1" defer></script>
-<script src="auth.js?v=secure-1" defer></script>
+<script src="auth.js?v=totp-2" defer></script>
 </body>
 </html>
