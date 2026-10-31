@@ -72,7 +72,7 @@
   <div class="main-shell">
     <header class="topbar">
       <div class="topbar-left"><button class="mobile-menu icon-button" id="menuBtn" aria-label="展开导航">☰</button><div class="breadcrumbs">工作空间 <span>/</span> <strong id="breadcrumb">数据总览</strong></div></div>
-      <div class="topbar-right"><span class="top-source"><span class="online-dot"></span> 本地静态数据</span><span class="user-pill"><span class="user-avatar">项</span>项目组</span><button class="top-btn secondary-btn logout-btn" id="logoutBtn" type="button">退出登录</button><button class="top-btn secondary-btn" id="importBtn"><span>↥</span> 导入CSV</button><button class="top-btn primary-btn" id="exportBtn" hidden><span>⇩</span> 导出数据</button></div>
+      <div class="topbar-right"><span class="top-source"><span class="online-dot"></span> Supabase 私有数据</span><span class="user-pill"><span class="user-avatar">项</span>项目组</span><button class="top-btn secondary-btn logout-btn" id="logoutBtn" type="button">退出登录</button><button class="top-btn secondary-btn" id="importBtn"><span>↥</span> 导入CSV</button><button class="top-btn primary-btn" id="exportBtn" hidden><span>⇩</span> 导出数据</button></div>
     </header>
     <main class="main-content" id="mainContent">
       <section class="page active-page" id="page-dashboard">
@@ -126,6 +126,6 @@
 <input type="file" id="fileInput" accept=".csv,text/csv" hidden>
 <script src="secure-config.js?v=secure-1" defer></script>
 <script src="vendor/qrcodegen.min.js?v=totp-svg-2" defer></script>
-<script src="auth.js?v=totp-svg-2" defer></script>
+<script src="auth.js?v=storage-fix-20261031" defer></script>
 </body>
 </html>
