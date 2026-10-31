@@ -36,7 +36,7 @@
           <strong>首次登录 · 绑定手机验证器</strong>
           <p>请使用 Google Authenticator 或 Microsoft Authenticator 扫描二维码。请勿截图或向他人透露密钥。</p>
           <div id="totpQr" class="totp-qr" role="img" aria-label="手机身份验证器绑定二维码" hidden></div>
-          <div class="totp-manual"><span>无法扫码？在验证器中手动添加密钥：</span><code id="totpSecret"></code></div>
+          <details class="totp-manual" id="totpManual"><summary>无法扫码？展开手动绑定密钥</summary><code id="totpSecret"></code></details>
           <p>绑定后请在下方输入验证器显示的6位数字，完成首次验证。</p>
         </div>
         <div class="captcha-box"><span class="otp-mail-hint"><span aria-hidden="true">▣</span> 在手机身份验证器中查看6位数字</span></div>
