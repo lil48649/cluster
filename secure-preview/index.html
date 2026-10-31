@@ -8,7 +8,7 @@
   <meta name="referrer" content="strict-origin-when-cross-origin">
   <meta name="description" content="GBD 2023中国低体力活动归因疾病负担：科研数据查询与管理平台">
   <title>GBD Research Hub · 科研数据管理系统</title>
-  <link rel="stylesheet" href="styles.css?v=totp-2">
+  <link rel="stylesheet" href="styles.css?v=totp-qr-1">
 </head>
 <body>
 <section class="login-screen" id="loginScreen" aria-labelledby="loginTitle">
@@ -35,7 +35,7 @@
         <div id="totpSetup" class="totp-setup" hidden>
           <strong>首次登录 · 绑定手机验证器</strong>
           <p>请使用 Google Authenticator 或 Microsoft Authenticator 扫描二维码。请勿截图或向他人透露密钥。</p>
-          <img id="totpQr" alt="当前账号的 TOTP 绑定二维码" width="176" height="176" hidden>
+          <div id="totpQr" class="totp-qr" role="img" aria-label="手机身份验证器绑定二维码" hidden></div>
           <div class="totp-manual"><span>无法扫码？在验证器中手动添加密钥：</span><code id="totpSecret"></code></div>
           <p>绑定后请在下方输入验证器显示的6位数字，完成首次验证。</p>
         </div>
@@ -125,6 +125,7 @@
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 <input type="file" id="fileInput" accept=".csv,text/csv" hidden>
 <script src="secure-config.js?v=secure-1" defer></script>
-<script src="auth.js?v=totp-2" defer></script>
+<script src="vendor/qrcode.min.js?v=totp-qr-1" defer></script>
+<script src="auth.js?v=totp-qr-1" defer></script>
 </body>
 </html>
