@@ -24,6 +24,15 @@ create table if not exists public.login_otp_challenges (
 alter table public.login_otp_challenges enable row level security;
 revoke all on table public.login_otp_challenges from anon, authenticated;
 
+-- Per-user send limits apply ACROSS sessions, not only within a single login session.
+create table if not exists public.otp_send_quotas (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  period_start timestamptz not null default now(),
+  send_count integer not null default 0
+);
+alter table public.otp_send_quotas enable row level security;
+revoke all on table public.otp_send_quotas from anon, authenticated;
+
 create table if not exists public.otp_verified_sessions (
   user_id uuid not null references auth.users(id) on delete cascade,
   session_id uuid not null,
@@ -43,7 +52,9 @@ language plpgsql
 security definer
 set search_path = ''
 as $$
-declare v_count integer;
+declare
+  v_count integer;
+  v_quota public.otp_send_quotas%rowtype;
 begin
   if not exists (
     select 1 from public.project_members
@@ -51,6 +62,26 @@ begin
   ) then
     return false;
   end if;
+
+  -- Serialize issuance per account. Separate sessions cannot bypass this throttle.
+  perform pg_advisory_xact_lock(hashtext(p_user_id::text)::bigint);
+  if exists (
+    select 1 from public.login_otp_challenges
+    where user_id = p_user_id and sent_at > now() - interval '60 seconds'
+  ) then return false; end if;
+
+  insert into public.otp_send_quotas(user_id) values (p_user_id)
+    on conflict (user_id) do nothing;
+  select * into v_quota from public.otp_send_quotas
+    where user_id = p_user_id for update;
+  if v_quota.period_start > now() - interval '1 hour'
+     and v_quota.send_count >= 10 then return false; end if;
+  update public.otp_send_quotas
+    set send_count = case when period_start <= now() - interval '1 hour'
+                          then 1 else send_count + 1 end,
+        period_start = case when period_start <= now() - interval '1 hour'
+                            then now() else period_start end
+    where user_id = p_user_id;
 
   insert into public.login_otp_challenges
     (user_id, session_id, code_hash, sent_at, expires_at, attempts)
