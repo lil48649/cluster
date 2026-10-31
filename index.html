@@ -9,6 +9,30 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+<section class="login-screen" id="loginScreen" aria-labelledby="loginTitle">
+  <div class="login-topline"><div class="login-top-brand"><span class="login-top-cross">✚</span><div><strong>GBD RESEARCH HUB</strong><small>CHRONIC DISEASE RESEARCH PLATFORM</small></div></div><span class="login-top-right">科研数据库 · GBD 2023</span></div>
+  <div class="login-heading"><span>RESEARCH DATA MANAGEMENT</span><h1 id="loginTitle">慢性病科研数据管理系统</h1><p>中国低体力活动归因疾病负担 · 数据检索与统计分析平台</p></div>
+  <div class="login-card">
+    <div class="login-visual" aria-hidden="true">
+      <div class="login-visual-glow"></div><div class="medical-panel"><div class="medical-panel-top"><span>GBD / 2023</span><span>● ● ●</span></div><div class="medical-panel-content"><div class="medical-panel-symbol">✚</div><div class="medical-panel-lines"><b></b><b></b><b></b></div></div><div class="medical-chart"><svg width="220" height="72" viewBox="0 0 220 72" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M0 53 L25 53 L37 37 L51 57 L68 12 L84 63 L107 40 L124 40 L138 21 L158 48 L178 29 L198 43 L220 16" fill="none" stroke="#2987ed" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+      <div class="login-visual-footer"><span class="visual-status-dot"></span> IHME GLOBAL BURDEN OF DISEASE <span class="visual-year">1990 — 2023</span></div>
+    </div>
+    <div class="login-form-wrap">
+      <div class="login-form-eyebrow">WELCOME BACK</div><h2>登录管理平台</h2><p class="login-subtitle">请使用项目组账号登录科研数据管理系统</p>
+      <form id="loginForm" autocomplete="on" novalidate>
+        <label for="loginRole">登录角色</label><div class="login-field"><span class="field-prefix">▦</span><select id="loginRole" name="role" required><option value="" selected disabled>请选择登录角色</option><option value="project">项目组</option></select></div>
+        <label for="loginUsername">登录账号</label><div class="login-field"><span class="field-prefix">♙</span><input type="text" id="loginUsername" name="username" autocomplete="username" spellcheck="false" placeholder="请输入账号" required maxlength="80"></div>
+        <label for="loginPassword">登录密码</label><div class="login-field"><span class="field-prefix">◇</span><input type="password" id="loginPassword" name="password" autocomplete="current-password" placeholder="请输入密码" required><button id="togglePassword" class="login-eye" type="button" aria-label="显示密码" aria-pressed="false">显示</button></div>
+        <div class="login-options"><label class="remember-label"><input type="checkbox" id="rememberSession" checked> 本次浏览器会话保持登录</label></div>
+        <p class="login-error" id="loginError" role="alert" aria-live="polite"></p>
+        <button class="login-submit" type="submit" id="loginSubmit">登 录 <span>→</span></button>
+      </form>
+      <p class="login-safety-note">本登录仅用于静态网页的界面校验，<strong>并非服务端访问控制</strong>。公开仓库中的数据可直接访问。</p>
+    </div>
+  </div>
+  <div class="login-bottom"><span>© GBD Research Hub · 科研数据平台</span><span>数据服务仅供科研参考</span></div>
+  <div class="login-cityline" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+</section>
 <div class="app" id="app">
   <aside class="sidebar" id="sidebar">
     <div class="brand">
@@ -29,7 +53,7 @@
   <div class="main-shell">
     <header class="topbar">
       <div class="topbar-left"><button class="mobile-menu icon-button" id="menuBtn" aria-label="展开导航">☰</button><div class="breadcrumbs">工作空间 <span>/</span> <strong id="breadcrumb">数据总览</strong></div></div>
-      <div class="topbar-right"><span class="top-source"><span class="online-dot"></span> 本地静态数据</span><button class="top-btn secondary-btn" id="importBtn"><span>↥</span> 导入CSV</button><button class="top-btn primary-btn" id="exportBtn"><span>⇩</span> 导出数据</button></div>
+      <div class="topbar-right"><span class="top-source"><span class="online-dot"></span> 本地静态数据</span><span class="user-pill"><span class="user-avatar">项</span>项目组</span><button class="top-btn secondary-btn logout-btn" id="logoutBtn" type="button">退出登录</button><button class="top-btn secondary-btn" id="importBtn"><span>↥</span> 导入CSV</button><button class="top-btn primary-btn" id="exportBtn"><span>⇩</span> 导出数据</button></div>
     </header>
     <main class="main-content" id="mainContent">
       <section class="page active-page" id="page-dashboard">
@@ -81,6 +105,6 @@
 <aside class="details-drawer" id="detailsDrawer" aria-label="记录详情" aria-hidden="true"><div class="drawer-head"><div><small>RECORD DETAIL</small><h2>科研记录详情</h2></div><button id="drawerClose" aria-label="关闭详情" class="drawer-close">×</button></div><div class="drawer-body" id="drawerBody"></div><div class="drawer-footer"><button class="top-btn secondary-btn" id="copyRecordBtn">复制 JSON</button><button class="top-btn primary-btn" id="drawerBookmarkBtn">☆ 收藏记录</button></div></aside>
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 <input type="file" id="fileInput" accept=".csv,text/csv" hidden>
-<script src="app.js" defer></script>
+<script src="auth.js" defer></script>
 </body>
 </html>
