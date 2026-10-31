@@ -165,6 +165,25 @@ function handlers(){
  $("importBtn").addEventListener("click",function(){$("fileInput").click()});$("fileInput").addEventListener("change",async function(e){var file=e.target.files[0];if(!file)return;try{var text=await file.text();setData(parseCSV(text),file.name);navigate("records")}catch(error){toast("导入失败："+error.message)}});
  $("menuBtn").addEventListener("click",function(){$("sidebar").classList.toggle("mobile-open")});
 }
-async function init(){handlers();try{var response=await window.GBD_SECURE_FETCH();if(!response.ok)throw Error("HTTP "+response.status);var text=await response.text();setData(parseCSV(text),"原始 GBD 2023 CSV")}catch(error){$("kpiGrid").innerHTML='<div class="loading">数据载入失败：'+esc(error.message)+'。请通过本地 HTTP 服务或 GitHub Pages 打开网页，或点击右上方「导入CSV」加载数据。</div>';toast("数据载入失败，请检查静态文件路径")}}
+async function loadPrivateData(){
+ var host=$("kpiGrid");
+ host.innerHTML='<div class="loading">正在通过 Supabase 验证访问权限并读取私有科研数据…</div>';
+ try{
+  var response=await window.GBD_SECURE_FETCH();
+  if(!response.ok){
+   var detail={};
+   try{detail=await response.clone().json()}catch(e){}
+   var safeCode=String(detail.code||detail.errorCode||"").replace(/[^a-zA-Z0-9_-]/g,"").slice(0,60);
+   throw Error("Supabase Storage HTTP "+response.status+(safeCode?" ["+safeCode+"]":""));
+  }
+  var text=await response.text();
+  setData(parseCSV(text),"Supabase 授权私有数据 · GBD 2023");
+ }catch(error){
+  host.innerHTML='<div class="loading"><strong>私有数据载入失败：</strong> '+esc(error.message)+'。请点击“重新读取”，若仍失败，请确认双因素登录状态及项目私有存储配置。 <button type="button" class="top-btn primary-btn" id="retryPrivateData">重新读取私有数据</button></div>';
+  var retry=$("retryPrivateData"); if(retry)retry.addEventListener("click",loadPrivateData);
+  toast("私有数据读取失败，请检查 Supabase Storage 授权");
+ }
+}
+function init(){handlers();loadPrivateData()}
 init();
 })();
