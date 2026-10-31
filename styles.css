@@ -99,3 +99,21 @@ html.authenticated .login-screen{display:none!important}
  .topbar{gap:5px}
  .logout-btn{font-size:10px;padding:0 7px}
 }
+
+
+/* Second-stage on-page challenge. UI only; not server-side MFA. */
+.top-btn[hidden],.login-form-wrap form[hidden]{display:none!important}
+.second-factor-form{animation:challenge-enter .18s ease-out}
+@keyframes challenge-enter{from{opacity:.7;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.second-factor-step{display:flex;gap:11px;align-items:flex-start;padding:12px 13px;background:#eff7ff;border:1px solid #d9eafa;border-radius:9px;margin-bottom:21px}
+.second-factor-step-icon{display:grid;place-items:center;flex:0 0 30px;height:30px;background:#277fe1;color:#fff;font-size:11px;font-weight:800;border-radius:8px}
+.second-factor-step strong{display:block;color:#244b70;font-size:12px;margin-top:1px}
+.second-factor-step p{color:#7c97ae;font-size:10px;line-height:1.7;margin-top:4px}
+.second-factor-form>label{display:block;color:#405c77;font-size:12px;font-weight:700;margin-bottom:8px}
+.captcha-box{display:flex;align-items:center;justify-content:space-between;border-radius:9px;border:1px solid #d8e8f6;background:linear-gradient(110deg,#e7f3ff,#f5faff);margin-bottom:14px;padding:10px 13px;gap:8px}
+.captcha-code{color:#245d9a;user-select:none;font-size:23px;line-height:1;letter-spacing:5px;font-family:"Trebuchet MS",Georgia,serif;font-weight:800;font-style:italic;text-decoration:underline wavy rgba(54,122,197,.28);text-underline-offset:5px;white-space:nowrap}
+.captcha-refresh{background:#fff;border:1px solid #cbdff0;border-radius:7px;padding:7px 11px;color:#3275b1;font-size:11px;white-space:nowrap}
+.captcha-refresh:hover{background:#e9f4ff}
+.captcha-lifetime{color:#97a8b8;font-size:10.5px;margin-top:-8px;margin-bottom:15px}
+.back-to-login{background:transparent;color:#688bad;border:0;display:block;margin:15px auto 0;font-size:11px}
+.back-to-login:hover{color:#246ec3}
