@@ -144,3 +144,6 @@ html.authenticated .login-screen{display:none!important}
 .totp-manual summary{cursor:pointer;font-size:11px;font-weight:700;color:#2f6caa;line-height:1.6}
 .totp-manual summary:hover{color:#14528e}
 .totp-manual code{overflow-wrap:anywhere}
+
+/* Native SVG QR: no canvas, no image data URI, no remote QR requests. */
+.totp-qr svg{display:block;width:232px;height:232px;max-width:100%;flex-shrink:0;shape-rendering:crispEdges}
