@@ -122,3 +122,15 @@ html.authenticated .login-screen{display:none!important}
 /* Server-verified email code: no code is displayed inside the browser UI. */
 .otp-mail-hint{font-size:11px;color:#3574a8;display:flex;gap:9px;align-items:center;line-height:1.55}
 .otp-mail-hint span{font-size:20px;color:#2e7ed0}
+
+
+/* Native TOTP enrollment shown only during first sign-in. */
+.totp-setup[hidden]{display:none!important}
+.totp-setup{margin:0 0 15px;padding:13px;background:#f0f7ff;border:1px solid #d9eafa;border-radius:10px;color:#335574;line-height:1.7}
+.totp-setup>strong{display:block;font-size:12px;color:#2564a6;margin-bottom:5px}
+.totp-setup p{font-size:11px;line-height:1.7;color:#587c9c;margin:6px 0}
+.totp-setup img{display:block;margin:11px auto;padding:8px;background:#fff;border:1px solid #d9e9f6;border-radius:10px;max-width:100%;object-fit:contain}
+.totp-setup img[hidden]{display:none}
+.totp-manual{margin:9px 0;padding:9px;background:#fff;border:1px solid #d6e7f5;border-radius:7px;overflow-wrap:anywhere}
+.totp-manual span{display:block;color:#567c9a;font-size:10px}
+.totp-manual code{display:block;margin-top:5px;font-size:11px;color:#265d93;letter-spacing:1px;user-select:all}
