@@ -58,7 +58,7 @@ function setData(data,sourceName){records=data;if(!records.length)throw Error("C
 function navigate(next){page=next;var names={dashboard:"数据总览",records:"数据档案",compare:"跨年比较",dictionary:"字段字典",quality:"质量核验"};
  document.querySelectorAll(".nav-item").forEach(function(el){el.classList.toggle("active",el.dataset.page===next)});
  document.querySelectorAll(".page").forEach(function(el){el.classList.toggle("active-page",el.id==="page-"+next)});
- $("breadcrumb").textContent=names[next];$("sidebar").classList.remove("mobile-open");window.scrollTo(0,0);
+ $("breadcrumb").textContent=names[next];$("sidebar").classList.remove("mobile-open");$("exportBtn").hidden=(next!=="records"&&next!=="compare");window.scrollTo(0,0);
  if(next==="records")renderTable();if(next==="compare")renderCompare();
  if(next==="quality")renderQuality()}
 function renderKpis(){var year=Number($("dashYear").value),sex=$("dashSex").value,comparison=year===2023?1990:2023;
@@ -143,7 +143,7 @@ function closeDetail(){$("detailsDrawer").classList.remove("open");$("detailsDra
 function toCSV(rows,headers){function quote(v){var s=String(v===undefined||v===null?"":v);return /[",\r\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s}
  return [headers.join(",")].concat(rows.map(function(r){return headers.map(function(h){return quote(r[h])}).join(",")})).join("\r\n")}
 function download(name,text){var blob=new Blob(["\uFEFF",text],{type:"text/csv;charset=utf-8"}),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(url)},1000);toast("CSV 已导出："+name)}
-function exportCurrent(){if(page==="compare"){exportCompare();return}var list=page==="records"?getView():records;download("GBD_2023_"+(page==="records"?"filtered":"all")+".csv",toCSV(list,HEADERS))}
+function exportCurrent(){if(page==="compare"){exportCompare();return}if(page!=="records")return;download("GBD_2023_filtered.csv",toCSV(getView(),HEADERS))}
 function exportCompare(){var rows=pairRows().map(function(x){return {cause:x.cause,measure:$("compareMeasure").value,sex:$("compareSex").value,val_1990:x.old,val_2023:x.now,absolute_change:x.delta,percentage_change:x.p}});download("GBD_1990_2023_comparison.csv",toCSV(rows,["cause","measure","sex","val_1990","val_2023","absolute_change","percentage_change"]))}
 function resetFilters(){$("recordSearch").value="";["filterCause","filterMeasure","filterSex","filterYear"].forEach(function(id){$(id).value=""});showFav=false;curPage=1;renderTable()}
 function handlers(){
