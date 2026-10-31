@@ -1,6 +1,6 @@
 (function(){
 "use strict";
-var SOURCE="data/gbd2023_low_physical_activity.csv";
+// The source CSV is private; it is fetched only via an authenticated server request.
 var HEADERS=["population_group","measure","location","sex","age","cause","rei","metric","year","val","upper","lower"];
 var MEASURES=["Deaths","DALYs (Disability-Adjusted Life Years)","YLLs (Years of Life Lost)","YLDs (Years Lived with Disability)"];
 var MNAME={"Deaths":"死亡人数","DALYs (Disability-Adjusted Life Years)":"DALY","YLLs (Years of Life Lost)":"YLL","YLDs (Years Lived with Disability)":"YLD"};
@@ -165,6 +165,6 @@ function handlers(){
  $("importBtn").addEventListener("click",function(){$("fileInput").click()});$("fileInput").addEventListener("change",async function(e){var file=e.target.files[0];if(!file)return;try{var text=await file.text();setData(parseCSV(text),file.name);navigate("records")}catch(error){toast("导入失败："+error.message)}});
  $("menuBtn").addEventListener("click",function(){$("sidebar").classList.toggle("mobile-open")});
 }
-async function init(){handlers();try{var response=await fetch(SOURCE,{cache:"no-cache"});if(!response.ok)throw Error("HTTP "+response.status);var text=await response.text();setData(parseCSV(text),"原始 GBD 2023 CSV")}catch(error){$("kpiGrid").innerHTML='<div class="loading">数据载入失败：'+esc(error.message)+'。请通过本地 HTTP 服务或 GitHub Pages 打开网页，或点击右上方「导入CSV」加载数据。</div>';toast("数据载入失败，请检查静态文件路径")}}
+async function init(){handlers();try{var response=await window.GBD_SECURE_FETCH();if(!response.ok)throw Error("HTTP "+response.status);var text=await response.text();setData(parseCSV(text),"原始 GBD 2023 CSV")}catch(error){$("kpiGrid").innerHTML='<div class="loading">数据载入失败：'+esc(error.message)+'。请通过本地 HTTP 服务或 GitHub Pages 打开网页，或点击右上方「导入CSV」加载数据。</div>';toast("数据载入失败，请检查静态文件路径")}}
 init();
 })();
