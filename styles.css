@@ -117,3 +117,8 @@ html.authenticated .login-screen{display:none!important}
 .captcha-lifetime{color:#97a8b8;font-size:10.5px;margin-top:-8px;margin-bottom:15px}
 .back-to-login{background:transparent;color:#688bad;border:0;display:block;margin:15px auto 0;font-size:11px}
 .back-to-login:hover{color:#246ec3}
+
+
+/* Server-verified email code: no code is displayed inside the browser UI. */
+.otp-mail-hint{font-size:11px;color:#3574a8;display:flex;gap:9px;align-items:center;line-height:1.55}
+.otp-mail-hint span{font-size:20px;color:#2e7ed0}
