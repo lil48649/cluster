@@ -1,84 +1,35 @@
-> **注意：本分支 secure-supabase 是未部署的服务端认证准备版本。**
-> 它与当前发布中的 web 分支不同，不再使用共享账号密码+浏览器验证码；而是每位成员的邮箱与个人密码、服务器邮件OTP及私有Storage RLS。
-> 新版完整部署流程参见 [SECURE_DEPLOYMENT.md](./SECURE_DEPLOYMENT.md)。下面的旧版描述只用于理解原有架构，不能当作新版安全配置说明。
+# GBD Research Hub｜安全版科研数据管理系统
 
-# GBD Research Hub｜科研数据查询与管理平台
+> 本文档适用于 `secure-supabase` 开发分支；当前 GitHub Pages 正式站点仍发布自 `web` 分支。**不要在尚未完成真实 TOTP 验收前切换生产网站。**
 
-一个采用医院信息管理系统（HIS）视觉语言的**静态科研数据门户**，实际数据来自上传的 IHME GBD 2023 CSV。**本项目不包含医院患者信息，不是电子病历系统。**
+## 身份验证
 
-## 数据内容
+1. 项目组成员使用经审批的个人邮箱和密码登录 Supabase Auth。
+2. 首次登录设置手机验证器（Google Authenticator / Microsoft Authenticator），扫描二维码，输入6位动态验证码。
+3. 之后登录必须再次使用手机验证器的 TOTP 验证码；Supabase Auth 将当前会话提升到 `aal2`。
+4. Supabase Storage RLS 同时核验用户白名单、有效登录会话、`aal2`、已验证的 TOTP 因子，满足后才允许读取指定私有 CSV。
+5. 15分钟无操作自动退出，本地会话仅使用 sessionStorage（如果用户选择保持本次会话）。
 
-- 地区：China；人群：All Population；年龄：All ages
-- 危险因素：Low physical activity；量纲：Number
-- 疾病：Diabetes mellitus type 2、Ischemic stroke、Ischemic heart disease
-- 指标：Deaths、DALYs、YLLs、YLDs
-- 性别：Both、Male、Female
-- 年份：1990、2023（只有两个观测端点）
-- 共 72 条记录，12 个原始字段，无缺失或维度重复；4 条数据的 UI 下限小于 0，保留原值
+本版本**无需 Resend、购买域名、SMTP 或邮件 OTP**。之前的邮件 Edge Functions 已停用（返回410）。
 
-源文件原样保存于 \`data/gbd2023_low_physical_activity.csv\`。前端 CSV 解析、筛选、统计和导出都在浏览器本地执行，不向第三方分析服务器提交数据。
+## 数据与查询
 
-## 功能
+- 原始研究数据必须存放在 Supabase 的 `gbd-private` 私有桶，文件名为 `gbd2023_low_physical_activity.csv`。
+- 前端仅通过经授权的 Storage API 加载数据；不再通过 GitHub Pages 公共 `data/` 路径获取。
+- 保留数据总览、数据档案、跨年比较、字段字典和质量核验功能。
+- 数据总览已移除CSV下载；其他页面此前已有的导出功能仍存在。已获准读取数据的用户无法被彻底阻止保存浏览器响应。
 
-1. **数据总览**：四项疾病负担指标卡片（同一指标、性别、年份下三病种合计）；病种1990/2023端点对比柱状图；2023年病种构成。此页面不显示CSV导出按钮。
-2. **数据档案**：疾病、指标、性别、年份组合筛选；关键词检索；列排序；分页；完整源字段详情、复制 JSON。
-3. **跨年比较**：分别计算同一指标、同一性别、同一疾病1990与2023年的绝对及相对变化，下载计算结果。
-4. **字段字典**：12个CSV字段释义与取值。
-5. **质量核验**：空值、重复复合键、区间边界、负下限提示及维度覆盖情况。
-6. **数据导入/导出**：右上方可导入同样12列结构的CSV供当前浏览器会话使用；按当前档案筛选条件导出源字段CSV；收藏记录保存在本机浏览器 localStorage。
+## 部署状态
 
-## 运行
+截至2026-10-31：Supabase 私有桶存在，已上传目标CSV；现有唯一已确认用户已经加入项目白名单。云端 TOTP RLS 规则已部署，前端已修改并在模拟测试中验证了密码登录、首次扫码绑定、TOTP挑战及进入页面的衔接，但**尚未使用真实手机验证器和实际用户凭据完成端到端登录**。
 
-该站点为 HTML + CSS + 原生 JavaScript，无需 npm 或后端。
+原公开仓库的 `web` 分支和Git历史中仍留有早先公开的CSV；已有副本无法依靠更改RLS恢复保密。
 
-\`\`\`bash
-git clone -b web https://github.com/lil48649/cluster.git
-cd cluster
-python -m http.server 8000
-\`\`\`
+详细部署及验收步骤见 [SECURE_DEPLOYMENT.md](./SECURE_DEPLOYMENT.md)。
 
-访问 \`http://localhost:8000/\`。**不要直接双击 index.html**：部分浏览器会阻止 file:// 页面通过 fetch 读取 CSV。
+## 安全约束
 
-## 发布到 GitHub Pages
-
-仓库管理员可在 GitHub → **Settings → Pages** → **Build and deployment** 选择 **Deploy from a branch**，分支选 \`web\`，目录选 \`/(root)\`，保存。部署成功后主页通常位于 \`https://lil48649.github.io/cluster/\`，**实际发布状态需要以 GitHub Pages 显示为准**。配置 Pages 可能需要仓库管理员操作，本次提交并不代表网站已经上线。
-
-## 重要统计学说明
-
-- \`metric=Number\`：原始数据为绝对数量，不代表年龄标准化率。
-- \`Both\` 包含男性和女性，不能再与 \`Male\` 和 \`Female\` 直接叠加。
-- 不跨指标求和，特别是 DALY、YLL、YLD 之间存在定义关联。
-- 页面展示的三病种合计仅是同一 measure × sex × year 内的**点估计求和**，不据此构造总体95%不确定区间。
-- 只有 1990 年和 2023 年：页面不进行逐年趋势插值、拟合、预测或年度变化率推断。
-- 95% UI 中出现负数下限时保留 GBD 上传值，不进行非负截断。
-- 本站点是单机静态查询工具，无后端数据库、用户鉴权、跨用户同步、医疗病历录入或审计日志。请勿把真实患者隐私数据上传到公开GitHub仓库。
-
-## 项目结构
-
-\`\`\`text
-index.html                           主页面
-styles.css                           响应式设计
-app.js                               CSV解析、检索、可视化与导出
-data/gbd2023_low_physical_activity.csv  原始数据
-README_WEB.md                        使用与发布说明
-\`\`\`
-
-## 项目组登录页（仅前端演示）
-
-当前 `web` 分支根目录已增加登录界面。访问原站点 `https://lil48649.github.io/cluster/` 时，将先看到项目组登录表单。
-
-- 角色：项目组
-- 账号：`sdmb`
-- 密码：由项目负责人另行提供；**不要在公开仓库中写入或发布明文密码**
-- 角色、账号及密码通过后，仍需完成页面随机生成的六位验证码（有效期2分钟；可刷新），然后按需加载 `app.js`；支持退出登录
-- 前端表单尝试5次失败后在当前浏览器标签页内冷却60秒；登录后15分钟无活动自动退出；单次会话最长8小时
-- 浏览器同一标签页可选择保持会话（sessionStorage），关闭标签页后登录状态通常会消失
-- 密码的公开校验器采用带盐的 PBKDF2-SHA256 派生值（210,000次），代码中不含明文密码
-- 原数据分析功能与网站 URL 不变；`auth.js` 负责登录、验证码、会话计时和动态加载主站脚本
-- 数据总览页已移除CSV导出入口及其在该页面的导出动作；**数据档案页的筛选结果CSV导出及跨年比较结果导出仍保留**
-
-### 重要：这不是安全的访问控制
-
-这是**静态网页界面校验**，新添加的六位验证码直接显示在登录页上，**并非独立渠道的OTP或真正多因素认证**，也**不是服务端身份认证**。访问者可以检查或修改浏览器 JavaScript，绕过表单进入界面；公开仓库中的 `data/gbd2023_low_physical_activity.csv` 仍可通过其 URL 下载。密码派生校验值公开也可能被离线猜解。不能用于保护敏感数据、患者信息、保密科研记录，也不应复用个人或其他系统密码。
-
-隐藏CSV下载按钮、前端频率限制和自动退出都只能增加界面操作约束。**数据仍在公开GitHub仓库和GitHub Pages上，可绕过这些按钮和登录页直接获取。**需要真正限定访问人员、保护数据下载权限时，应先将源CSV移出公开GitHub分支及可访问的静态路径，再使用服务端认证（可支持邮件OTP/TOTP）与受保护数据API；此操作需要管理员配置后端或访问网关，不是单靠GitHub Pages能完成的。
+- 公开代码仅允许包含 Supabase 的项目URL和 **publishable** key。
+- 绝不能在 GitHub 或聊天中公开服务角色密钥、数据库密码、用户密码、TOTP 绑定密钥。
+- 真实私有数据与用户凭据应始终由 Supabase 管理。
+- 新成员需先由管理员审核，再将其 `auth.users.id` 写入 `app_private.project_members`。
