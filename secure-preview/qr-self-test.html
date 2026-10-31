@@ -1,0 +1,8 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; base-uri 'self'">
+<title>二维码组件自检（不含任何真实密钥）</title>
+<style>body{font:16px system-ui,sans-serif;background:#f1f6ff;color:#153454;min-height:100vh;display:grid;place-items:center;margin:0}.panel{background:white;max-width:470px;width:90%;padding:32px;border-radius:16px;box-shadow:0 9px 30px #bed5eb88;text-align:center}#result{font-weight:700}#qr{display:flex;justify-content:center;margin:20px auto}#qr svg{width:232px;height:232px;max-width:100%;shape-rendering:crispEdges}small{display:block;line-height:1.7;color:#7390a8;margin-top:18px}</style>
+</head><body><main class="panel"><h2>二维码组件自检</h2><p id="result" role="status">正在检测…</p><div id="qr" role="img" aria-label="公开示例二维码"></div><small>此页面仅包含公开测试字符，不需要登录，不包含任何真实TOTP绑定密钥。<br>用于判断你的浏览器是否能够绘制本地SVG二维码。</small></main>
+<script src="vendor/qrcodegen.min.js?v=totp-svg-2" defer></script><script src="qr-self-test.js?v=totp-svg-2" defer></script>
+</body></html>
