@@ -85,7 +85,7 @@
   }
 
   async function isOtpVerified() {
-    const approved = await secureRequest("/rest/v1/rpc/has_verified_recent_otp", {
+    const approved = await secureRequest("/rest/v1/rpc/secure_has_verified_otp", {
       method: "POST", body: "{}",
     });
     return approved === true;
@@ -147,7 +147,7 @@
     try {
       if (session) {
         const token = await ensureAccessToken();
-        await request("/rest/v1/rpc/revoke_my_verified_session",
+        await request("/rest/v1/rpc/secure_revoke_own_otp",
           { method: "POST", body: "{}" }, token);
         await request("/auth/v1/logout",
           { method: "POST", body: "{}" }, token);
