@@ -1,30 +1,29 @@
 /*
- * Real server-side authorization flow:
- * 1) Supabase Auth verifies per-user EMAIL + PASSWORD.
- * 2) Edge Functions email a short-lived OTP and verify it on the server.
- * 3) Postgres RLS checks verified USER + SESSION before Storage allows reading.
- * This frontend never contains a shared password, email API secret or service key.
+ * GBD Research Hub: Supabase-managed MFA using native TOTP factors.
+ * Password and 6-digit TOTP are verified by Supabase Auth, not browser code.
+ * Private object Storage RLS requires project membership, current session,
+ * and AAL2 with a verified TOTP factor. Never publish secret API keys.
  */
 (function () {
   "use strict";
 
   const cfg = window.GBD_SECURE_CONFIG || {};
-  const storageKey = "gbd-secure-v1";
+  const sessionKey = "gbd-native-totp-session-v2";
   const idleMs = 15 * 60 * 1000;
   const $ = (id) => document.getElementById(id);
-
+  const ready = /^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(cfg.url || "") &&
+    /^sb_publishable_/.test(cfg.publishableKey || "");
   let session = null;
-  let otpEmail = "";
-  let lastActivity = Date.now();
-  let appLoaded = false;
   let keepSession = false;
+  let lastActivity = Date.now();
+  let lastSave = 0;
+  let activeFactorId = "";
+  let pendingEnrollment = false;
+  let appLoaded = false;
+  let busyLogout = false;
 
-  const ready = /^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(cfg.url || "")
-    && !!cfg.publishableKey
-    && !String(cfg.publishableKey).startsWith("SET_");
-
-  function errorMessage(err) {
-    return err && (err.msg || err.error_description || err.message || err.error) || "网络或服务器错误";
+  function errText(value) {
+    return String(value && (value.msg || value.error_description || value.message || value.error) || "网络或服务器错误");
   }
 
   function showError(id, value) {
@@ -33,77 +32,90 @@
 
   function clearSession() {
     session = null;
-    try { sessionStorage.removeItem(storageKey); } catch (_) {}
+    try { sessionStorage.removeItem(sessionKey); } catch (_) {}
   }
 
   function saveSession() {
     if (!keepSession || !session) return;
     try {
-      sessionStorage.setItem(storageKey, JSON.stringify({
-        session, lastActivity, keepSession: true
-      }));
+      sessionStorage.setItem(sessionKey, JSON.stringify({ session, lastActivity }));
+      lastSave = Date.now();
     } catch (_) {}
   }
 
-  function setSession(json) {
+  function setSession(data) {
+    const s = data && (data.session || data);
+    if (!s || typeof s.access_token !== "string" || typeof s.refresh_token !== "string") {
+      throw new Error("身份验证未返回完整会话，请重新登录。");
+    }
     session = {
-      access_token: json.access_token,
-      refresh_token: json.refresh_token,
-      expires_at: Date.now() + (Number(json.expires_in) || 3600) * 1000,
+      access_token: s.access_token,
+      refresh_token: s.refresh_token,
+      expires_at: Date.now() + (Number(s.expires_in) || 3600) * 1000
     };
     lastActivity = Date.now();
     saveSession();
   }
 
-  async function request(path, options = {}, token = null) {
+  async function request(path, opts, token) {
+    const options = opts || {};
     const headers = {
       "apikey": cfg.publishableKey,
       "Content-Type": "application/json",
-      ...(token ? { "Authorization": "Bearer " + token } : {}),
-      ...(options.headers || {}),
+      ...(token ? { Authorization: "Bearer " + token } : {}),
+      ...(options.headers || {})
     };
-    const response = await fetch(cfg.url + path, { ...options, headers, cache: "no-store" });
+    const response = await fetch(cfg.url + path, {
+      method: options.method || "GET",
+      headers,
+      body: options.body,
+      cache: "no-store"
+    });
     if (options.raw) return response;
-    const json = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(errorMessage(json));
-    return json;
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(errText(data));
+    return data;
   }
 
-  async function ensureAccessToken() {
-    if (!session) throw new Error("登录状态已失效，请重新登录。");
+  async function getAccessToken() {
+    if (!session) throw new Error("登录会话失效，请重新登录。");
     if (session.expires_at - Date.now() > 60000) return session.access_token;
-    const json = await request("/auth/v1/token?grant_type=refresh_token", {
-      method: "POST", body: JSON.stringify({ refresh_token: session.refresh_token }),
+    const refreshed = await request("/auth/v1/token?grant_type=refresh_token", {
+      method: "POST", body: JSON.stringify({ refresh_token: session.refresh_token })
     });
-    setSession(json);
+    setSession(refreshed);
     return session.access_token;
   }
 
-  async function secureRequest(path, options = {}) {
-    const token = await ensureAccessToken();
-    return request(path, options, token);
+  async function secure(path, options) {
+    const accessToken = await getAccessToken();
+    return request(path, options, accessToken);
   }
 
-  async function isOtpVerified() {
-    const approved = await secureRequest("/rest/v1/rpc/secure_has_verified_otp", {
-      method: "POST", body: "{}",
-    });
-    return approved === true;
+  async function hasMembership() {
+    return (await secure("/rest/v1/rpc/secure_my_membership", {
+      method: "POST", body: "{}"
+    })) === true;
   }
 
-  // Public app.js calls this function. Storage enforces RLS on EVERY request.
+  async function hasVerifiedMFA() {
+    return (await secure("/rest/v1/rpc/secure_has_verified_mfa", {
+      method: "POST", body: "{}"
+    })) === true;
+  }
+
   window.GBD_SECURE_FETCH = async function () {
-    if (!(await isOtpVerified())) {
-      throw new Error("二次验证已过期，请重新登录。");
+    if (!(await hasVerifiedMFA())) {
+      throw new Error("此登录会话尚未完成双因素认证，无法读取私有科研数据。");
     }
-    const token = await ensureAccessToken();
+    const token = await getAccessToken();
     const response = await request(
-      "/storage/v1/object/authenticated/" +
-        encodeURIComponent(cfg.bucket) + "/" + encodeURIComponent(cfg.objectPath),
+      "/storage/v1/object/authenticated/" + encodeURIComponent(cfg.bucket) +
+        "/" + encodeURIComponent(cfg.objectPath),
       { method: "GET", raw: true }, token
     );
     if (response.status === 401 || response.status === 403) {
-      throw new Error("私有数据访问被拒绝，请检查项目组授权或重新登录。");
+      throw new Error("服务器拒绝读取私有数据，请检查授权与TOTP验证状态。");
     }
     return response;
   };
@@ -114,175 +126,226 @@
     document.documentElement.classList.add("authenticated");
     $("loginPassword").value = "";
     $("challengeInput").value = "";
+    $("totpSecret").textContent = "";
+    $("totpQr").removeAttribute("src");
     const script = document.createElement("script");
-    script.src = "app.js?v=secure-1";
+    script.src = "app.js?v=totp-2";
     script.onerror = function () {
       appLoaded = false;
       document.documentElement.classList.remove("authenticated");
-      showError("loginError", "科研数据界面载入失败，请检查文件。");
+      showError("challengeError", "管理系统脚本加载失败，请刷新重试。");
     };
     document.body.appendChild(script);
   }
 
-  function showOtpForm() {
+  function showSecondStep(enroll) {
+    pendingEnrollment = enroll;
+    $("totpSetup").hidden = !enroll;
+    $("loginPassword").value = "";
     $("loginForm").hidden = true;
     $("secondFactorForm").hidden = false;
     $("challengeInput").value = "";
-    $("challengeInput").focus();
+    showError("challengeError", "");
+    if (!enroll) $("challengeInput").focus();
   }
 
-  async function requestOtp() {
-    await secureRequest("/functions/v1/send-email-otp", {
-      method: "POST", body: "{}",
+  function showEnrollment(data) {
+    const raw = String(data && data.totp && data.totp.qr_code || "");
+    const img = $("totpQr");
+    let source = "";
+    if (raw.startsWith("data:image/svg+xml")) source = raw;
+    else if (raw.trim().startsWith("<svg")) {
+      source = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(raw);
+    }
+    img.hidden = !source;
+    if (source) img.src = source;
+    $("totpSecret").textContent = String(data && data.totp && data.totp.secret || "");
+    showSecondStep(true);
+  }
+
+  async function enrollOrChallenge() {
+    const user = await secure("/auth/v1/user");
+    if (!user || !user.id) throw new Error("无法确认当前登录用户。");
+    if (!(await hasMembership())) throw new Error("该账号未加入项目组授权名单。");
+
+    if (await hasVerifiedMFA()) {
+      openPortal();
+      return;
+    }
+
+    const all = Array.isArray(user.factors) ? user.factors : [];
+    const verified = all.find(function (f) {
+      return f.factor_type === "totp" && f.status === "verified";
     });
-  }
 
-  function loginUIReset() {
-    $("loginForm").hidden = false;
-    $("secondFactorForm").hidden = true;
-    $("loginPassword").value = "";
+    if (verified) {
+      activeFactorId = verified.id;
+      showSecondStep(false);
+      return;
+    }
+
+    // An earlier abandoned enrollment cannot reveal its secret again.
+    // Discard only unverified TOTP factors owned by this authenticated user.
+    for (const factor of all) {
+      if (factor.factor_type === "totp" && factor.status === "unverified") {
+        await secure("/auth/v1/factors/" + encodeURIComponent(factor.id), {
+          method: "DELETE"
+        });
+      }
+    }
+    const enrolled = await secure("/auth/v1/factors", {
+      method: "POST",
+      body: JSON.stringify({ factor_type: "totp", friendly_name: "GBD Research Hub" })
+    });
+    if (!enrolled || !enrolled.id || !enrolled.totp) {
+      throw new Error("服务器没有返回身份验证器绑定信息。");
+    }
+    activeFactorId = enrolled.id;
+    showEnrollment(enrolled);
   }
 
   async function signOut() {
+    if (busyLogout) return;
+    busyLogout = true;
     try {
       if (session) {
-        const token = await ensureAccessToken();
-        await request("/rest/v1/rpc/secure_revoke_own_otp",
-          { method: "POST", body: "{}" }, token);
-        await request("/auth/v1/logout",
-          { method: "POST", body: "{}" }, token);
+        const token = await getAccessToken();
+        await request("/auth/v1/logout", { method: "POST", body: "{}" }, token);
       }
     } catch (_) {
-      // Clear local access even if server is temporarily unreachable.
+      // Always clear the browser session on logout, even when offline.
     } finally {
       clearSession();
       location.reload();
     }
   }
 
-  $("loginForm").addEventListener("submit", async function (e) {
-    e.preventDefault();
+  $("loginForm").addEventListener("submit", async function (event) {
+    event.preventDefault();
     if (!ready) {
-      showError("loginError", "云端服务尚未配置。请先按照安全部署指南完成设置。");
+      showError("loginError", "Supabase公开客户端配置无效，请联系管理员。");
       return;
     }
     if ($("loginRole").value !== "project") {
       showError("loginError", "请选择项目组角色。");
       return;
     }
-    const email = $("loginUsername").value.trim().toLowerCase();
+    const email = $("loginUsername").value.trim();
     const password = $("loginPassword").value;
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !password) {
-      showError("loginError", "请填写已授权邮箱和个人登录密码。");
+      showError("loginError", "请输入已授权的邮箱与个人密码。");
       return;
     }
-    const button = $("loginSubmit");
-    button.disabled = true;
+    const btn = $("loginSubmit");
+    btn.disabled = true;
     showError("loginError", "");
+    keepSession = $("rememberSession").checked;
     try {
-      const result = await request("/auth/v1/token?grant_type=password", {
-        method: "POST", body: JSON.stringify({ email, password }),
+      const auth = await request("/auth/v1/token?grant_type=password", {
+        method: "POST", body: JSON.stringify({ email, password })
       });
-      keepSession = $("rememberSession").checked;
-      setSession(result);
-      otpEmail = email;
-      await requestOtp();
-      showOtpForm();
-    } catch (err) {
-      showError("loginError", "身份验证或发送验证码失败：" + errorMessage(err));
+      setSession(auth);
+      await enrollOrChallenge();
+    } catch (error) {
+      showError("loginError", "登录失败：" + errText(error));
       clearSession();
     } finally {
-      button.disabled = false;
+      btn.disabled = false;
+      $("loginPassword").value = "";
     }
   });
 
-  $("secondFactorForm").addEventListener("submit", async function (e) {
-    e.preventDefault();
+  $("secondFactorForm").addEventListener("submit", async function (event) {
+    event.preventDefault();
     const code = $("challengeInput").value.trim();
-    if (!/^\d{6}$/.test(code)) {
-      showError("challengeError", "请输入邮件中的6位数字验证码。");
+    if (!/^[0-9]{6}$/.test(code)) {
+      showError("challengeError", "请输入手机验证器中的6位数字。");
       return;
     }
-    const button = $("secondFactorSubmit");
-    button.disabled = true;
+    if (!activeFactorId) {
+      showError("challengeError", "缺少验证器信息，请返回并重新登录。");
+      return;
+    }
+    const btn = $("secondFactorSubmit");
+    btn.disabled = true;
     showError("challengeError", "");
     try {
-      const result = await secureRequest("/functions/v1/verify-email-otp", {
-        method: "POST", body: JSON.stringify({ code }),
+      const id = encodeURIComponent(activeFactorId);
+      const challenge = await secure("/auth/v1/factors/" + id + "/challenge", {
+        method: "POST", body: "{}"
       });
-      if (!result.ok || !(await isOtpVerified())) throw new Error("二次验证未获授权");
+      if (!challenge || !challenge.id) throw new Error("未生成双因素验证挑战。");
+      const verified = await secure("/auth/v1/factors/" + id + "/verify", {
+        method: "POST",
+        body: JSON.stringify({ challenge_id: challenge.id, code })
+      });
+      setSession(verified);
+      if (!(await hasVerifiedMFA())) {
+        throw new Error("第二步认证未通过项目组访问许可，请联系管理员。");
+      }
+      pendingEnrollment = false;
+      activeFactorId = "";
       saveSession();
       openPortal();
-    } catch (err) {
-      showError("challengeError", "验证码不正确、已过期或服务器拒绝授权。");
+    } catch (error) {
+      showError("challengeError", "TOTP验证失败：" + errText(error));
       $("challengeInput").value = "";
     } finally {
-      button.disabled = false;
+      btn.disabled = false;
     }
   });
 
-  $("refreshChallenge").addEventListener("click", async function () {
-    try {
-      await requestOtp();
-      showError("challengeError", "已重新发送验证码，请查看邮箱（每60秒仅能申请一次）。");
-    } catch (err) {
-      showError("challengeError", "暂时无法重发，请间隔60秒后再试。");
-    }
-  });
-
-  $("returnToLogin").addEventListener("click", async function () {
-    await signOut();
-  });
-
+  $("returnToLogin").addEventListener("click", signOut);
+  $("logoutBtn").addEventListener("click", signOut);
   $("togglePassword").addEventListener("click", function () {
-    const control = $("loginPassword");
-    const visible = control.type === "password";
-    control.type = visible ? "text" : "password";
+    const password = $("loginPassword");
+    const visible = password.type === "password";
+    password.type = visible ? "text" : "password";
     this.textContent = visible ? "隐藏" : "显示";
     this.setAttribute("aria-pressed", String(visible));
+    this.setAttribute("aria-label", visible ? "隐藏密码" : "显示密码");
   });
 
-  $("logoutBtn").addEventListener("click", signOut);
-
-  for (const event of ["pointerdown", "keydown", "scroll"]) {
-    window.addEventListener(event, () => {
-      if (session) {
-        if (Date.now() - lastActivity > idleMs) {
-          signOut();
-        } else {
-          lastActivity = Date.now();
-          saveSession();
-        }
-      }
-    }, { passive: true });
+  function recordActivity() {
+    if (!session || busyLogout) return;
+    if (Date.now() - lastActivity >= idleMs) {
+      signOut();
+      return;
+    }
+    lastActivity = Date.now();
+    if (keepSession && Date.now() - lastSave > 20000) saveSession();
   }
-  setInterval(() => {
-    if (session && Date.now() - lastActivity > idleMs) signOut();
+  ["pointerdown", "keydown", "scroll"].forEach(function (event) {
+    window.addEventListener(event, recordActivity, { passive: true });
+  });
+  window.addEventListener("focus", function () {
+    if (session && Date.now() - lastActivity >= idleMs) signOut();
+  });
+  setInterval(function () {
+    if (session && Date.now() - lastActivity >= idleMs) signOut();
   }, 30000);
 
-  (async function init() {
+  (async function restore() {
     if (!ready) {
-      showError("loginError", "管理员尚未完成私有数据云端配置，此开发版本暂不能登录。");
+      showError("loginError", "尚未配置可用的Supabase客户端连接。");
       return;
     }
     try {
-      const stored = JSON.parse(sessionStorage.getItem(storageKey) || "null");
-      if (!stored || !stored.session || Date.now() - stored.lastActivity > idleMs) {
+      const stored = JSON.parse(sessionStorage.getItem(sessionKey) || "null");
+      if (!stored || !stored.session || Date.now() - Number(stored.lastActivity) >= idleMs) {
         clearSession();
         return;
       }
       session = stored.session;
+      lastActivity = Number(stored.lastActivity);
       keepSession = true;
-      lastActivity = stored.lastActivity;
-      if (await isOtpVerified()) {
+      if (await hasVerifiedMFA()) {
         openPortal();
       } else {
         clearSession();
-        loginUIReset();
       }
     } catch (_) {
       clearSession();
-      loginUIReset();
     }
   })();
 })();
