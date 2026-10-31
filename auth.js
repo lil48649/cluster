@@ -155,17 +155,15 @@
     $("totpSecret").textContent = secret;
     showSecondStep(true);
 
-    // Render entirely in this browser: QR data must never be sent to an
-    // external QR-generation service. The authenticated Supabase enrollment
-    // secret is also available for manual entry if the browser has no QR support.
+    // The TOTP URI and secret are NEVER sent to a third-party service.
+    // Render QR modules as native SVG DOM nodes, not canvas or remote images.
     const target = $("totpQr");
-    target.textContent = "";
+    target.replaceChildren();
     target.hidden = true;
     if (!/^[A-Z2-7]{16,}$/.test(secret)) {
-      showError("challengeError", "绑定密钥格式异常，请退出后重新登录生成新密钥。");
+      showError("challengeError", "绑定密钥格式异常，请返回登录并重新生成。");
       return;
     }
-
     const uri = typeof totp.uri === "string" && totp.uri.startsWith("otpauth://totp/")
       ? totp.uri
       : "otpauth://totp/" + encodeURIComponent(
@@ -175,22 +173,42 @@
         "&algorithm=SHA1&digits=6&period=30";
 
     try {
-      if (typeof window.QRCode !== "function") {
-        throw new Error("QR renderer unavailable");
+      const qrLibrary = window.qrgen || window.qrcodegen;
+      if (!qrLibrary || !qrLibrary.QrCode) throw new Error("QR library unavailable");
+      const qr = qrLibrary.QrCode.encodeText(uri, qrLibrary.QrCode.Ecc.MEDIUM);
+      const quiet = 4;
+      const ns = "http://www.w3.org/2000/svg";
+      const svg = document.createElementNS(ns, "svg");
+      svg.setAttribute("viewBox", "0 0 " + (qr.size + quiet * 2) + " " + (qr.size + quiet * 2));
+      svg.setAttribute("width", "232");
+      svg.setAttribute("height", "232");
+      svg.setAttribute("role", "presentation");
+      const background = document.createElementNS(ns, "rect");
+      background.setAttribute("width", "100%");
+      background.setAttribute("height", "100%");
+      background.setAttribute("fill", "#ffffff");
+      svg.appendChild(background);
+      let modules = "";
+      for (let y = 0; y < qr.size; y++) {
+        for (let x = 0; x < qr.size; x++) {
+          if (qr.getModule(x, y)) {
+            modules += "M" + (x + quiet) + "," + (y + quiet) + "h1v1h-1z";
+          }
+        }
       }
-      new window.QRCode(target, {
-        text: uri,
-        width: 192,
-        height: 192,
-        colorDark: "#172a45",
-        colorLight: "#ffffff",
-        correctLevel: window.QRCode.CorrectLevel.M
-      });
+      const squares = document.createElementNS(ns, "path");
+      squares.setAttribute("d", modules);
+      squares.setAttribute("fill", "#172a45");
+      svg.appendChild(squares);
+      target.appendChild(svg);
       target.hidden = false;
+      showError("challengeError", "");
     } catch (error) {
-      target.textContent = "";
+      target.replaceChildren();
       target.hidden = true;
-      showError("challengeError", "二维码暂时无法显示，可手动添加上方密钥，或刷新页面重新登录。");
+      // Do not log the TOTP URI or secret.
+      const category = error instanceof Error ? error.name : "UnknownError";
+      showError("challengeError", "二维码生成失败（" + category + "），可展开手动绑定密钥。");
     }
   }
 
