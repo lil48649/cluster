@@ -1,330 +1,288 @@
 /*
- * Interface-only login gate for a public static website.
- * THIS IS NOT SECURITY AUTHENTICATION OR TRUE MFA.
- * The public CSV, all JS code and the password verifier remain accessible
- * to anyone without logging in. Do not host sensitive information here.
+ * Real server-side authorization flow:
+ * 1) Supabase Auth verifies per-user EMAIL + PASSWORD.
+ * 2) Edge Functions email a short-lived OTP and verify it on the server.
+ * 3) Postgres RLS checks verified USER + SESSION before Storage allows reading.
+ * This frontend never contains a shared password, email API secret or service key.
  */
 (function () {
   "use strict";
 
-  const ROLE = "project";
-  const USER = "sdmb";
-  const SESSION_KEY = "gbd-research-hub-demo-session";
-  const FAIL_KEY = "gbd-research-hub-auth-failures";
-  const SALT_HEX = "bb42e84da7eb9f071697f2ee736c2eee";
-  const EXPECTED_HEX = "5d25c6fc75e3f410fb4d06dcebf517ed772eef03542772c06909a4ddea957ddb";
-  const ITERATIONS = 210000;
+  const cfg = window.GBD_SECURE_CONFIG || {};
+  const storageKey = "gbd-secure-v1";
+  const idleMs = 15 * 60 * 1000;
+  const $ = (id) => document.getElementById(id);
 
-  const CHALLENGE_VALID_MS = 2 * 60 * 1000;
-  const IDLE_TIMEOUT_MS = 15 * 60 * 1000;
-  const MAX_SESSION_MS = 8 * 60 * 60 * 1000;
-  const MAX_FAILURES = 5;
-  const COOLDOWN_MS = 60 * 1000;
-  const CAPTCHA_ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
+  let session = null;
+  let otpEmail = "";
+  let lastActivity = Date.now();
+  let appLoaded = false;
+  let keepSession = false;
 
-  const input = (id) => document.getElementById(id);
-  let loading = false;
-  let loggedIn = false;
-  let challenge = "";
-  let challengeCreatedAt = 0;
-  let loggedInAt = 0;
-  let lastActiveAt = 0;
-  let lastPersistAt = 0;
-  let persistInSession = false;
+  const ready = /^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(cfg.url || "")
+    && !!cfg.publishableKey
+    && !String(cfg.publishableKey).startsWith("SET_");
 
-  function fromHex(hex) {
-    return new Uint8Array(hex.match(/.{2}/g).map((s) => parseInt(s, 16)));
+  function errorMessage(err) {
+    return err && (err.msg || err.error_description || err.message || err.error) || "网络或服务器错误";
   }
 
-  async function verifyPassword(password) {
-    if (!window.crypto || !window.crypto.subtle) {
-      throw new Error("当前浏览器不支持安全加密接口，请使用 HTTPS 打开网站");
-    }
-    const key = await crypto.subtle.importKey(
-      "raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveBits"]
-    );
-    const result = new Uint8Array(await crypto.subtle.deriveBits(
-      { name: "PBKDF2", hash: "SHA-256", salt: fromHex(SALT_HEX), iterations: ITERATIONS },
-      key, 256
-    ));
-    const expected = fromHex(EXPECTED_HEX);
-    let mismatch = 0;
-    for (let i = 0; i < expected.length; i++) mismatch |= expected[i] ^ result[i];
-    return mismatch === 0;
-  }
-
-  function storageRead(key) {
-    try { return sessionStorage.getItem(key); }
-    catch (_) { return null; }
-  }
-
-  function storageWrite(key, value) {
-    try { sessionStorage.setItem(key, value); }
-    catch (_) { /* private storage may not be available */ }
-  }
-
-  function storageRemove(key) {
-    try { sessionStorage.removeItem(key); }
-    catch (_) { /* private storage may not be available */ }
-  }
-
-  function setError(id, message) {
-    input(id).textContent = message;
-  }
-
-  function failureInfo() {
-    try {
-      const raw = JSON.parse(storageRead(FAIL_KEY) || "{}");
-      return { count: Number(raw.count) || 0, until: Number(raw.until) || 0 };
-    } catch (_) {
-      return { count: 0, until: 0 };
-    }
-  }
-
-  function lockedForSeconds() {
-    return Math.max(0, Math.ceil((failureInfo().until - Date.now()) / 1000));
-  }
-
-  function failedAttempt() {
-    const record = failureInfo();
-    if (record.until && Date.now() >= record.until) {
-      record.count = 0;
-      record.until = 0;
-    }
-    record.count++;
-    if (record.count >= MAX_FAILURES) {
-      record.count = 0;
-      record.until = Date.now() + COOLDOWN_MS;
-    }
-    storageWrite(FAIL_KEY, JSON.stringify(record));
-    return lockedForSeconds();
-  }
-
-  function resetFailures() {
-    storageRemove(FAIL_KEY);
-  }
-
-  function issueChallenge() {
-    if (!crypto || typeof crypto.getRandomValues !== "function") {
-      throw new Error("当前浏览器不支持验证码所需的加密随机数接口");
-    }
-    const bytes = new Uint8Array(6);
-    crypto.getRandomValues(bytes);
-    challenge = Array.from(bytes, (x) => CAPTCHA_ALPHABET[x % CAPTCHA_ALPHABET.length]).join("");
-    challengeCreatedAt = Date.now();
-    input("challengeDisplay").textContent = challenge;
-    input("challengeInput").value = "";
-    setError("challengeError", "");
-  }
-
-  function startChallenge() {
-    issueChallenge();
-    input("loginPassword").value = "";
-    input("loginForm").hidden = true;
-    input("secondFactorForm").hidden = false;
-    input("challengeInput").focus();
-  }
-
-  function returnToLogin() {
-    challenge = "";
-    challengeCreatedAt = 0;
-    input("secondFactorForm").hidden = true;
-    input("loginForm").hidden = false;
-    input("loginPassword").value = "";
-    setError("challengeError", "");
-    input("loginPassword").focus();
-  }
-
-  function validSession(obj) {
-    if (!obj || obj.role !== ROLE || obj.user !== USER) return false;
-    const started = Number(obj.started);
-    const last = Number(obj.last);
-    const now = Date.now();
-    return Number.isFinite(started) && Number.isFinite(last)
-      && started <= now && last <= now
-      && now - started < MAX_SESSION_MS && now - last < IDLE_TIMEOUT_MS;
-  }
-
-  function restoreSession() {
-    try {
-      const parsed = JSON.parse(storageRead(SESSION_KEY) || "null");
-      if (!validSession(parsed)) {
-        storageRemove(SESSION_KEY);
-        return false;
-      }
-      loggedInAt = Number(parsed.started);
-      lastActiveAt = Number(parsed.last);
-      persistInSession = true;
-      return true;
-    } catch (_) {
-      storageRemove(SESSION_KEY);
-      return false;
-    }
-  }
-
-  function saveSession() {
-    if (!persistInSession) return;
-    storageWrite(SESSION_KEY, JSON.stringify({
-      role: ROLE, user: USER, started: loggedInAt, last: lastActiveAt
-    }));
+  function showError(id, value) {
+    $(id).textContent = value;
   }
 
   function clearSession() {
-    storageRemove(SESSION_KEY);
+    session = null;
+    try { sessionStorage.removeItem(storageKey); } catch (_) {}
   }
 
-  function expireAndReload() {
-    clearSession();
-    window.location.reload();
+  function saveSession() {
+    if (!keepSession || !session) return;
+    try {
+      sessionStorage.setItem(storageKey, JSON.stringify({
+        session, lastActivity, keepSession: true
+      }));
+    } catch (_) {}
   }
 
-  function isExpired() {
-    const now = Date.now();
-    return loggedIn && (now - lastActiveAt >= IDLE_TIMEOUT_MS
-      || now - loggedInAt >= MAX_SESSION_MS
-      || now < lastActiveAt || now < loggedInAt);
+  function setSession(json) {
+    session = {
+      access_token: json.access_token,
+      refresh_token: json.refresh_token,
+      expires_at: Date.now() + (Number(json.expires_in) || 3600) * 1000,
+    };
+    lastActivity = Date.now();
+    saveSession();
   }
 
-  function onActivity() {
-    if (!loggedIn) return;
-    if (isExpired()) {
-      expireAndReload();
-      return;
-    }
-    const now = Date.now();
-    lastActiveAt = now;
-    if (persistInSession && now - lastPersistAt > 20000) {
-      saveSession();
-      lastPersistAt = now;
-    }
+  async function request(path, options = {}, token = null) {
+    const headers = {
+      "apikey": cfg.publishableKey,
+      "Content-Type": "application/json",
+      ...(token ? { "Authorization": "Bearer " + token } : {}),
+      ...(options.headers || {}),
+    };
+    const response = await fetch(cfg.url + path, { ...options, headers, cache: "no-store" });
+    if (options.raw) return response;
+    const json = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(errorMessage(json));
+    return json;
   }
 
-  function startSessionWatch() {
-    document.addEventListener("pointerdown", onActivity, { passive: true });
-    document.addEventListener("keydown", onActivity);
-    document.addEventListener("scroll", onActivity, { passive: true });
-    window.addEventListener("focus", function () {
-      if (isExpired()) expireAndReload();
+  async function ensureAccessToken() {
+    if (!session) throw new Error("登录状态已失效，请重新登录。");
+    if (session.expires_at - Date.now() > 60000) return session.access_token;
+    const json = await request("/auth/v1/token?grant_type=refresh_token", {
+      method: "POST", body: JSON.stringify({ refresh_token: session.refresh_token }),
     });
-    window.setInterval(function () {
-      if (isExpired()) expireAndReload();
-    }, 30000);
+    setSession(json);
+    return session.access_token;
   }
+
+  async function secureRequest(path, options = {}) {
+    const token = await ensureAccessToken();
+    return request(path, options, token);
+  }
+
+  async function isOtpVerified() {
+    const approved = await secureRequest("/rest/v1/rpc/has_verified_recent_otp", {
+      method: "POST", body: "{}",
+    });
+    return approved === true;
+  }
+
+  // Public app.js calls this function. Storage enforces RLS on EVERY request.
+  window.GBD_SECURE_FETCH = async function () {
+    if (!(await isOtpVerified())) {
+      throw new Error("二次验证已过期，请重新登录。");
+    }
+    const token = await ensureAccessToken();
+    const response = await request(
+      "/storage/v1/object/authenticated/" +
+        encodeURIComponent(cfg.bucket) + "/" + encodeURIComponent(cfg.objectPath),
+      { method: "GET", raw: true }, token
+    );
+    if (response.status === 401 || response.status === 403) {
+      throw new Error("私有数据访问被拒绝，请检查项目组授权或重新登录。");
+    }
+    return response;
+  };
 
   function openPortal() {
-    if (loading) return;
-    loading = true;
-    loggedIn = true;
+    if (appLoaded) return;
+    appLoaded = true;
     document.documentElement.classList.add("authenticated");
-    input("loginPassword").value = "";
-    input("challengeInput").value = "";
+    $("loginPassword").value = "";
+    $("challengeInput").value = "";
     const script = document.createElement("script");
-    script.src = "app.js?v=20261031-2";
+    script.src = "app.js?v=secure-1";
     script.onerror = function () {
-      loggedIn = false;
-      loading = false;
-      clearSession();
+      appLoaded = false;
       document.documentElement.classList.remove("authenticated");
-      returnToLogin();
-      setError("loginError", "管理系统文件加载失败，请刷新网页再试。");
+      showError("loginError", "科研数据界面载入失败，请检查文件。");
     };
     document.body.appendChild(script);
   }
 
-  input("loginForm").addEventListener("submit", async function (event) {
-    event.preventDefault();
-    if (loading) return;
-    const lock = lockedForSeconds();
-    if (lock) {
-      setError("loginError", "尝试次数过多，请 " + lock + " 秒后重试。");
-      return;
-    }
-    const role = input("loginRole").value;
-    const user = input("loginUsername").value.trim();
-    const password = input("loginPassword").value;
-    if (!role || !user || !password) {
-      setError("loginError", "请选择登录角色，并填写账号和密码。");
-      return;
-    }
+  function showOtpForm() {
+    $("loginForm").hidden = true;
+    $("secondFactorForm").hidden = false;
+    $("challengeInput").value = "";
+    $("challengeInput").focus();
+  }
 
-    const submit = input("loginSubmit");
-    submit.disabled = true;
-    submit.textContent = "正在校验…";
-    setError("loginError", "");
+  async function requestOtp() {
+    await secureRequest("/functions/v1/send-email-otp", {
+      method: "POST", body: "{}",
+    });
+  }
+
+  function loginUIReset() {
+    $("loginForm").hidden = false;
+    $("secondFactorForm").hidden = true;
+    $("loginPassword").value = "";
+  }
+
+  async function signOut() {
     try {
-      const passwordOK = await verifyPassword(password);
-      if (role !== ROLE || user !== USER || !passwordOK) {
-        const wait = failedAttempt();
-        setError("loginError", wait
-          ? "尝试次数过多，请 " + wait + " 秒后重试。"
-          : "登录角色、账号或密码不正确，请重试。");
-        input("loginPassword").value = "";
-      } else {
-        startChallenge();
+      if (session) {
+        const token = await ensureAccessToken();
+        await request("/rest/v1/rpc/revoke_my_verified_session",
+          { method: "POST", body: "{}" }, token);
+        await request("/auth/v1/logout",
+          { method: "POST", body: "{}" }, token);
       }
-    } catch (error) {
-      setError("loginError", error.message || "登录校验不可用，请刷新重试。");
+    } catch (_) {
+      // Clear local access even if server is temporarily unreachable.
     } finally {
-      submit.disabled = false;
-      submit.innerHTML = '下一步 <span>→</span>';
+      clearSession();
+      location.reload();
+    }
+  }
+
+  $("loginForm").addEventListener("submit", async function (e) {
+    e.preventDefault();
+    if (!ready) {
+      showError("loginError", "云端服务尚未配置。请先按照安全部署指南完成设置。");
+      return;
+    }
+    if ($("loginRole").value !== "project") {
+      showError("loginError", "请选择项目组角色。");
+      return;
+    }
+    const email = $("loginUsername").value.trim().toLowerCase();
+    const password = $("loginPassword").value;
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !password) {
+      showError("loginError", "请填写已授权邮箱和个人登录密码。");
+      return;
+    }
+    const button = $("loginSubmit");
+    button.disabled = true;
+    showError("loginError", "");
+    try {
+      const result = await request("/auth/v1/token?grant_type=password", {
+        method: "POST", body: JSON.stringify({ email, password }),
+      });
+      keepSession = $("rememberSession").checked;
+      setSession(result);
+      otpEmail = email;
+      await requestOtp();
+      showOtpForm();
+    } catch (err) {
+      showError("loginError", "身份验证或发送验证码失败：" + errorMessage(err));
+      clearSession();
+    } finally {
+      button.disabled = false;
     }
   });
 
-  input("secondFactorForm").addEventListener("submit", function (event) {
-    event.preventDefault();
-    if (loading) return;
-    const lock = lockedForSeconds();
-    if (lock) {
-      returnToLogin();
-      setError("loginError", "尝试次数过多，请 " + lock + " 秒后重新登录。");
+  $("secondFactorForm").addEventListener("submit", async function (e) {
+    e.preventDefault();
+    const code = $("challengeInput").value.trim();
+    if (!/^\d{6}$/.test(code)) {
+      showError("challengeError", "请输入邮件中的6位数字验证码。");
       return;
     }
-    if (!challenge || Date.now() - challengeCreatedAt > CHALLENGE_VALID_MS) {
-      issueChallenge();
-      setError("challengeError", "验证码已过期，请输入新验证码。");
-      return;
+    const button = $("secondFactorSubmit");
+    button.disabled = true;
+    showError("challengeError", "");
+    try {
+      const result = await secureRequest("/functions/v1/verify-email-otp", {
+        method: "POST", body: JSON.stringify({ code }),
+      });
+      if (!result.ok || !(await isOtpVerified())) throw new Error("二次验证未获授权");
+      saveSession();
+      openPortal();
+    } catch (err) {
+      showError("challengeError", "验证码不正确、已过期或服务器拒绝授权。");
+      $("challengeInput").value = "";
+    } finally {
+      button.disabled = false;
     }
-    const value = input("challengeInput").value.trim().toUpperCase();
-    if (value !== challenge) {
-      const wait = failedAttempt();
-      if (wait) {
-        returnToLogin();
-        setError("loginError", "尝试次数过多，请 " + wait + " 秒后重新登录。");
-      } else {
-        issueChallenge();
-        setError("challengeError", "验证码不正确，已自动刷新，请重新输入。");
-        input("challengeInput").focus();
-      }
-      return;
-    }
-    challenge = "";
-    resetFailures();
-    loggedInAt = Date.now();
-    lastActiveAt = loggedInAt;
-    persistInSession = input("rememberSession").checked;
-    if (persistInSession) saveSession();
-    else clearSession();
-    openPortal();
   });
 
-  input("refreshChallenge").addEventListener("click", function () {
-    issueChallenge();
-    input("challengeInput").focus();
+  $("refreshChallenge").addEventListener("click", async function () {
+    try {
+      await requestOtp();
+      showError("challengeError", "已重新发送验证码，请查看邮箱（每60秒仅能申请一次）。");
+    } catch (err) {
+      showError("challengeError", "暂时无法重发，请间隔60秒后再试。");
+    }
   });
 
-  input("returnToLogin").addEventListener("click", returnToLogin);
+  $("returnToLogin").addEventListener("click", async function () {
+    await signOut();
+  });
 
-  input("togglePassword").addEventListener("click", function () {
-    const password = input("loginPassword");
-    const visible = password.type === "password";
-    password.type = visible ? "text" : "password";
+  $("togglePassword").addEventListener("click", function () {
+    const control = $("loginPassword");
+    const visible = control.type === "password";
+    control.type = visible ? "text" : "password";
     this.textContent = visible ? "隐藏" : "显示";
-    this.setAttribute("aria-label", visible ? "隐藏密码" : "显示密码");
     this.setAttribute("aria-pressed", String(visible));
   });
 
-  input("logoutBtn").addEventListener("click", expireAndReload);
+  $("logoutBtn").addEventListener("click", signOut);
 
-  if (restoreSession()) openPortal();
-  startSessionWatch();
+  for (const event of ["pointerdown", "keydown", "scroll"]) {
+    window.addEventListener(event, () => {
+      if (session) {
+        if (Date.now() - lastActivity > idleMs) {
+          signOut();
+        } else {
+          lastActivity = Date.now();
+          saveSession();
+        }
+      }
+    }, { passive: true });
+  }
+  setInterval(() => {
+    if (session && Date.now() - lastActivity > idleMs) signOut();
+  }, 30000);
+
+  (async function init() {
+    if (!ready) {
+      showError("loginError", "管理员尚未完成私有数据云端配置，此开发版本暂不能登录。");
+      return;
+    }
+    try {
+      const stored = JSON.parse(sessionStorage.getItem(storageKey) || "null");
+      if (!stored || !stored.session || Date.now() - stored.lastActivity > idleMs) {
+        clearSession();
+        return;
+      }
+      session = stored.session;
+      keepSession = true;
+      lastActivity = stored.lastActivity;
+      if (await isOtpVerified()) {
+        openPortal();
+      } else {
+        clearSession();
+        loginUIReset();
+      }
+    } catch (_) {
+      clearSession();
+      loginUIReset();
+    }
+  })();
 })();
