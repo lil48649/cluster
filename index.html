@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#10243c">
   <meta name="description" content="GBD 2023中国低体力活动归因疾病负担：科研数据查询与管理平台">
   <title>GBD Research Hub · 科研数据管理系统</title>
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=20261031-2">
 </head>
 <body>
 <section class="login-screen" id="loginScreen" aria-labelledby="loginTitle">
@@ -27,7 +27,17 @@
         <p class="login-error" id="loginError" role="alert" aria-live="polite"></p>
         <button class="login-submit" type="submit" id="loginSubmit">登 录 <span>→</span></button>
       </form>
-      <p class="login-safety-note">本登录仅用于静态网页的界面校验，<strong>并非服务端访问控制</strong>。公开仓库中的数据可直接访问。</p>
+      <form id="secondFactorForm" class="second-factor-form" hidden autocomplete="off" novalidate>
+        <div class="second-factor-step"><span class="second-factor-step-icon">02</span><div><strong>第二步 · 验证码核验</strong><p>密码已核对。请输入下面显示的6位验证码以继续。</p></div></div>
+        <label for="challengeInput">安全验证码</label>
+        <div class="captcha-box"><span id="challengeDisplay" class="captcha-code" aria-label="当前验证码"></span><button type="button" id="refreshChallenge" class="captcha-refresh" aria-label="更换验证码">↻ 更换</button></div>
+        <div class="login-field"><span class="field-prefix">▣</span><input type="text" id="challengeInput" name="captcha" inputmode="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="请输入6位验证码" maxlength="6" required></div>
+        <p class="captcha-lifetime">验证码两分钟内有效，字母不区分大小写。</p>
+        <p class="login-error" id="challengeError" role="alert" aria-live="polite"></p>
+        <button class="login-submit" id="secondFactorSubmit" type="submit">验证并进入 <span>→</span></button>
+        <button id="returnToLogin" class="back-to-login" type="button">← 返回账号登录</button>
+      </form>
+      <p class="login-safety-note">登录含前端验证码与闲置超时机制，<strong>并非真正的多因素认证或服务端权限控制</strong>。公开仓库中的CSV仍可被直接访问。</p>
     </div>
   </div>
   <div class="login-bottom"><span>© GBD Research Hub · 科研数据平台</span><span>数据服务仅供科研参考</span></div>
@@ -53,7 +63,7 @@
   <div class="main-shell">
     <header class="topbar">
       <div class="topbar-left"><button class="mobile-menu icon-button" id="menuBtn" aria-label="展开导航">☰</button><div class="breadcrumbs">工作空间 <span>/</span> <strong id="breadcrumb">数据总览</strong></div></div>
-      <div class="topbar-right"><span class="top-source"><span class="online-dot"></span> 本地静态数据</span><span class="user-pill"><span class="user-avatar">项</span>项目组</span><button class="top-btn secondary-btn logout-btn" id="logoutBtn" type="button">退出登录</button><button class="top-btn secondary-btn" id="importBtn"><span>↥</span> 导入CSV</button><button class="top-btn primary-btn" id="exportBtn"><span>⇩</span> 导出数据</button></div>
+      <div class="topbar-right"><span class="top-source"><span class="online-dot"></span> 本地静态数据</span><span class="user-pill"><span class="user-avatar">项</span>项目组</span><button class="top-btn secondary-btn logout-btn" id="logoutBtn" type="button">退出登录</button><button class="top-btn secondary-btn" id="importBtn"><span>↥</span> 导入CSV</button><button class="top-btn primary-btn" id="exportBtn" hidden><span>⇩</span> 导出数据</button></div>
     </header>
     <main class="main-content" id="mainContent">
       <section class="page active-page" id="page-dashboard">
@@ -105,6 +115,6 @@
 <aside class="details-drawer" id="detailsDrawer" aria-label="记录详情" aria-hidden="true"><div class="drawer-head"><div><small>RECORD DETAIL</small><h2>科研记录详情</h2></div><button id="drawerClose" aria-label="关闭详情" class="drawer-close">×</button></div><div class="drawer-body" id="drawerBody"></div><div class="drawer-footer"><button class="top-btn secondary-btn" id="copyRecordBtn">复制 JSON</button><button class="top-btn primary-btn" id="drawerBookmarkBtn">☆ 收藏记录</button></div></aside>
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 <input type="file" id="fileInput" accept=".csv,text/csv" hidden>
-<script src="auth.js" defer></script>
+<script src="auth.js?v=20261031-2" defer></script>
 </body>
 </html>
